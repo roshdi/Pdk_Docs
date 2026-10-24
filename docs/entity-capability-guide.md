@@ -619,9 +619,14 @@ Each `Has*` method returns a builder for fluent configuration.
 | `HasUpdateCommand(name?)` | `CommandBuilder<TEntity>` | Generates an update command; uses the primary key by default and supports `MatchBy` |
 | `HasDeleteCommand(name?)` | `CommandBuilder<TEntity>` | Generates a delete command |
 | `HasUpsertCommand(name?)` | `CommandBuilder<TEntity>` | Generates a create-or-update command using explicit match fields |
+| `HasBulkUpdateCommand(name)` | `CommandBuilder<TEntity>` | Generates a transactional bulk update using the primary key or `MatchBy` fields |
+| `HasBulkDeleteCommand(name?)` | `CommandBuilder<TEntity>` | Generates a transactional bulk delete using the primary key or `MatchBy` fields |
+| `HasBulkInsertCommand(name?)` | `CommandBuilder<TEntity>` | Generates a transactional bulk insert with per-item validation |
+| `HasBulkUpsertCommand(name?)` | `CommandBuilder<TEntity>` | Generates a transactional bulk upsert using required `MatchBy` fields |
+| `HasImportFromExcelCommand(name?)` | `CommandBuilder<TEntity>` | Generates an `.xlsx` import endpoint and editable mapping profile |
 | `HasGetItemQuery(name?)` | `QueryBuilder<TEntity>` | Generates a single-item query; defaults to the primary key |
 | `HasGetByIdQuery(name?)` | `QueryBuilder<TEntity>` | Compatibility alias for the primary-key item query |
-| `HasGetListQuery(name?)` | `QueryBuilder<TEntity>` | Generates a list query |
+| `HasGetListQuery(name?)` | `QueryBuilder<TEntity>` | Generates a list query; `MatchBy` can add required equality filters |
 | `HasLookupQuery(name?)` | `QueryBuilder<TEntity>` | Generates a lookup query |
 
 All methods accept an optional `name` parameter to customize the generated
@@ -678,6 +683,115 @@ Omitting `MatchBy` produces `PDK400`. An unmapped, computed, or concurrency matc
 field produces `PDK401`. Diagnostics include the feature-profile source file and
 line.
 
+### Bulk Update Commands
+
+For the complete request shapes, validation policies, concurrency behavior, and
+result contract, see [Bulk Update and Delete Commands](bulk-commands.md).
+
+A bulk update uses the primary key by default. `SharedUpdate` generates the
+shared update fields directly on the command and applies them to every matched
+row:
+
+```csharp
+HasBulkUpdateCommand("Activate")
+    .SharedUpdate(barcode => barcode.IsActive)
+    .ItemValidator<ActivateProductBarcodeItemValidator>()
+    .OnValidationFailure(BulkFailureBehavior.SkipInvalidItems)
+    .MaximumBatchSize(5000);
+```
+
+For a single primary key, the generated request contains an ID array followed
+by the shared fields. For example, the command above accepts
+`{ "productBarcodeIds": [1, 2], "isActive": true }`. Composite business keys
+use a `matches` array alongside the same flattened shared fields:
+
+```csharp
+HasBulkUpdateCommand("Assign")
+    .MatchBy(item => new { item.WarehouseId, item.Code })
+    .SharedUpdate(item => new { item.OwnerId, item.IsActive });
+```
+
+Add `WithConcurrency()` when the entity implements `IOptimisticConcurrency`:
+
+```csharp
+HasBulkUpdateCommand("Activate")
+    .WithConcurrency()
+    .SharedUpdate(barcode => new { barcode.IsActive, barcode.PartnerId })
+    .MaximumBatchSize(5000);
+```
+
+Concurrency generates a match object for every row, even when selection uses a
+single primary key. The key or `MatchBy` fields identify the row; its concurrency
+token verifies the submitted version. A missing or stale row rejects the entire
+batch with HTTP 409 before any mutation.
+
+Use `PerItemUpdate` when each row has different update values:
+
+```csharp
+HasBulkUpdateCommand("Reclassify")
+    .MatchBy(item => new { item.WarehouseId, item.Code })
+    .PerItemUpdate(item => new { item.CategoryId, item.IsActive });
+```
+
+Per-item requests contain an `items` array with match and update fields. Duplicate
+match keys are rejected. The handler loads all security-visible entities in one
+query, invokes modification capabilities, and calls `SaveChangesAsync` once. The
+result reports requested, matched, updated, and not-found counts. Developers can
+override `CustomizeUpdateAsync` in the non-generated partial handler for operation
+rules that cannot be expressed as field mapping.
+
+Use a FluentValidation item validator for rules that must be evaluated separately
+for every matched entity:
+
+```csharp
+public sealed class ActivateProductBarcodeItemValidator
+    : AbstractValidator<BulkItemValidationContext<ProductBarcodeEntity,
+        ActivateProductBarcodeCommand>>
+{
+    public ActivateProductBarcodeItemValidator()
+    {
+        RuleFor(row => row.Entity.IsActive)
+            .Equal(false)
+            .WithErrorCode("AlreadyActive");
+    }
+}
+```
+
+`RollbackBatch` (the default) marks invalid rows as failed, valid rows as not
+processed, and saves nothing. `SkipInvalidItems` marks invalid rows as skipped and
+saves valid rows once. Each row result preserves FluentValidation property names,
+messages, codes, attempted values, severity, and custom state.
+
+### Bulk Delete Commands
+
+For the complete bulk-delete contract, see
+[Bulk Update and Delete Commands](bulk-commands.md#bulk-delete).
+
+Bulk delete uses the primary key by default:
+
+```csharp
+HasBulkDeleteCommand()
+    .MaximumBatchSize(5000);
+```
+
+Use a named operation and `MatchBy` for one or more business-key columns:
+
+```csharp
+HasBulkDeleteCommand("RemoveByWarehouseCode")
+    .MatchBy(item => new { item.WarehouseId, item.Code })
+    .WithConcurrency();
+```
+
+`WithConcurrency()` is available for bulk update and bulk delete. Generation
+fails at the DSL source line unless the entity implements
+`IOptimisticConcurrency` and exposes exactly one mapped concurrency token.
+
+The generated endpoint uses POST (`DeleteBulk` by default) so its JSON body is
+portable across clients and proxies. The handler applies permission and row-level
+security filters, loads matching entities once, invokes `ISoftDelete` when the
+entity supports it, otherwise performs hard deletes, and saves once. Override
+`CustomizeDeleteAsync` in the partial handler for additional domain rules.
+
 ### Item Queries and Match Fields
 
 `HasGetItemQuery()` describes query cardinality rather than a specific identifier.
@@ -707,6 +821,29 @@ one logical result.
 An entity with neither a primary key nor explicit match fields produces `PDK402`.
 An invalid or unmapped item match field produces `PDK403`, including its source
 file and line. `HasGetByIdQuery()` remains available as a compatibility alias.
+
+### Required List Filters
+
+Use `MatchBy` on a list query when the operation must always be constrained by
+one or more entity fields:
+
+```csharp
+HasGetListQuery("ByProduct")
+    .MatchBy(barcode => barcode.ProductId);
+
+HasGetListQuery("ByWarehouseAndProduct")
+    .MatchBy(barcode => barcode.WarehouseId, barcode => barcode.ProductId);
+```
+
+PDK adds strongly typed match properties to the generated request, validates
+them, and applies an `AND` equality predicate to the entity query before
+security, projection, QueryKit filters, sorting, and pagination. A named list
+query generates one POST endpoint whose route is the supplied operation name;
+the properties are JSON request fields. Use ordinary `ClientFilters` for
+optional filters; list `MatchBy` values are required operation inputs.
+
+The unnamed `HasGetListQuery()` retains the conventional pair of endpoints:
+`GET` at the empty group route and `POST` at `Search`.
 
 ### Generating Internal Operations Without Endpoints
 
@@ -759,6 +896,26 @@ filtering, sorting, and security filtering are derived from the source entity.
 The source type must be part of the EF model. Prefer a separate view entity or
 shared interface over EF entity inheritance when a table and view represent
 different database objects.
+
+#### Unmapped projection sources (`FromProjection`)
+
+Use `FromProjection<TSource>()` for list queries whose read model is a flat,
+unmapped LINQ result, for example a table join or aggregate replacing a view:
+
+```csharp
+HasGetListQuery("Browse")
+    .FromProjection<ProductListItem>()
+    .IncludeAll();
+```
+
+PDK generates the query contract, validator, mapper, handler, and endpoint under
+the owning feature. Implement the generated `CreateProjectionQuery` partial
+method in the developer-owned handler file; do not edit `.g.cs` files. No EF
+mapping or primary key is required for `ProductListItem`. This method currently
+supports **list queries only**, not item or lookup queries.
+
+See [Projection-backed list queries](projection-queries.md) for an end-to-end
+example, field selection, authorization, filtering, paging, and limitations.
 
 #### Exclude
 
@@ -850,6 +1007,21 @@ HasCreateCommand()
     .IncludeNavigation(o => o.Customer);
 ```
 
+When the navigation DTO is input for a nested command rather than a new entity graph,
+disable generated entity mapping while retaining the DTO in the command contract:
+
+```csharp
+HasCreateCommand()
+    .IncludeNavigation(
+        o => o.Customer,
+        customer => customer.IncludeAll(),
+        mapToEntity: false);
+```
+
+This emits `CustomerDto` but prevents Mapperly from assigning it to
+`OrderEntity.Customer`. See [Nested Command Orchestration](nested-command-orchestration.md)
+for safe create/update handler execution and transaction ownership.
+
 Include a child collection:
 
 ```csharp
@@ -907,7 +1079,7 @@ HasGetItemQuery()
 
 | Method | Purpose |
 | --- | --- |
-| `IncludeNavigation(expr)` | Include a scalar navigation (many-to-one reference) |
+| `IncludeNavigation(expr, builder?, mapToEntity = true)` | Include a scalar navigation; set `mapToEntity: false` for nested-command input |
 | `IncludeDetail(expr, builder?)` | Include a collection navigation (one-to-many children) |
 | `ExcludeNavigation(expr)` | Exclude a navigation from the operation |
 

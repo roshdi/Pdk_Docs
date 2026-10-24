@@ -304,8 +304,8 @@ to override defaults.
 The `Has*` methods return a `CommandBuilder<T>` or `QueryBuilder<T>` with
 fluent methods: `Exclude`, `Include`, `IncludeAll`, `IncludeOnly`,
 `IncludeNavigation`, `IncludeDetail`, `ExcludeNavigation`, and
-`WithoutEndpoint`. Item queries, update commands, and upsert commands also support
-`MatchBy`.
+`WithoutEndpoint`. Item and list queries, update commands, and upsert commands
+also support `MatchBy`.
 
 `HasGetItemQuery()` defaults to the entity primary key and continues to generate
 the conventional `GetById...` operation. A custom item lookup declares its unique
@@ -315,12 +315,31 @@ match fields explicitly:
 HasGetItemQuery("GetByCode")
     .MatchBy(product => product.Code);
 
+HasGetListQuery("ByWarehouse")
+    .MatchBy(product => product.WarehouseId);
+
 HasUpdateCommand("UpdateByCode")
     .MatchBy(product => product.Code);
 
 HasUpsertCommand("Synchronize")
     .MatchBy(product => product.Code)
     .WithoutEndpoint();
+
+HasBulkUpdateCommand("Activate")
+    .SharedUpdate(product => product.IsActive)
+    .ItemValidator<ActivateProductItemValidator>()
+    .OnValidationFailure(BulkFailureBehavior.SkipInvalidItems)
+    .MaximumBatchSize(5000);
+
+HasBulkUpdateCommand("UpdatePrices")
+    .MatchBy(product => new { product.WarehouseId, product.Code })
+    .PerItemUpdate(product => product.Price);
+
+HasBulkDeleteCommand()
+    .MaximumBatchSize(5000);
+
+HasBulkDeleteCommand("RemoveByWarehouseCode")
+    .MatchBy(product => new { product.WarehouseId, product.Code });
 ```
 
 An update command without `MatchBy` continues to locate its row by primary key.
@@ -329,10 +348,53 @@ fields from the command, and generates an `AND` predicate for composite matches.
 Back every update or upsert match with a database unique key or index; execution
 fails explicitly if multiple visible rows match.
 
+Bulk updates use the primary key by default and support composite `MatchBy` keys.
+`SharedUpdate` generates its common update fields directly on the command next
+to the ID or `matches` collection. `PerItemUpdate` generates an `items` payload
+with update values per match. The generated handler applies the security
+filter, loads all rows in one query, saves once, and exposes
+`CustomizeUpdateAsync` for developer-owned domain changes.
+
+See [Bulk Update and Delete Commands](bulk-commands.md) for JSON request shapes,
+per-row FluentValidation, failure policies, concurrency, and generated results.
+
+Bulk update and delete commands can validate every matched row with FluentValidation.
+Use `ItemValidator<TValidator>()` to register a validator for
+`BulkItemValidationContext<TEntity, TCommand>`. `OnValidationFailure` has two
+explicit policies: `RollbackBatch` (the default) saves nothing when any row is
+invalid; `SkipInvalidItems` saves valid rows and reports invalid rows as skipped.
+The result contains a row key and the complete FluentValidation failures, including
+property, message, error code, attempted value, severity, and custom state.
+
+Use `WithConcurrency()` on a bulk update or bulk delete to require one optimistic
+concurrency value per row. The entity must implement `IOptimisticConcurrency`
+and expose exactly one mapped concurrency token. Selection continues to use the
+primary key or `MatchBy`; a missing or stale row rejects the whole batch with
+HTTP 409.
+
+Bulk delete generates a POST `{name}Bulk` endpoint with the same primary-key or
+composite `MatchBy` selection. It applies row security, uses `ISoftDelete` when
+available, otherwise removes matched entities, and exposes `CustomizeDeleteAsync`.
+
+For a list query, generated `MatchBy` request fields are required equality
+filters. They are applied before projection and compose with security filters,
+QueryKit filters, sorting, and pagination. Use `ClientFilters` instead when a
+filter must remain optional. The unnamed list operation generates `GET ""` and
+`POST "Search"`; a named list operation generates one POST endpoint using its
+name as the route.
+
 `WithoutEndpoint()` leaves the generated contracts, validator, handler, and mapper
 available for internal use. For list queries it suppresses both GET and search
 endpoints. Regeneration removes stale generated endpoints while preserving modified
 companion scaffolds for review.
+
+For a list backed by a custom LINQ projection rather than a mapped table or view,
+declare `HasGetListQuery("Browse").FromProjection<ProductListItem>().IncludeAll()`.
+Generation keeps the owning feature's routes and permissions and requires a
+developer-owned `CreateProjectionQuery` partial implementation. See
+[Projection-backed list queries](projection-queries.md) for the full example,
+supported scalar types, runtime pipeline, and security requirements. Use
+`From<TSource>()` instead when the source is another mapped EF entity.
 
 Multi-level master-detail is supported via nested `IncludeDetail` calls:
 
@@ -445,7 +507,11 @@ The hash covers the file body without the marker. PDK normalizes the UTF-8 BOM a
 line endings before hashing, but treats formatting and whitespace edits as developer
 changes. The preceding two-line marker/hash format remains readable for compatibility.
 The retired `.pdk/generate-api.manifest.json` is removed after successful cleanup;
-Angular generation continues to use its separate UI manifest policy.
+Angular generation continues to use its separate UI manifest policy. Feature-module
+TypeScript and HTML structure is owned by the Scriban templates under
+`src/Pdk.Cli/Templates/AngularApp/src/app/modules/`. The C# Angular grid generator
+prepares validated template models and applies generated-file ownership policy; it
+does not assemble module artifacts with TypeScript string builders.
 
 ### Export metadata
 

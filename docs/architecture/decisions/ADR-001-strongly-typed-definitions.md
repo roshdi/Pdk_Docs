@@ -27,6 +27,13 @@ Examples of runtime configuration include connection strings, credentials, signi
 keys, and session lifetimes. Examples of structural definitions include services,
 entities, schemas, features, permissions, and seeds.
 
+Property-set DSL methods accept either one direct property (`x => x.Title`) or an
+anonymous projection (`x => new { x.Title, x.Code }`). A projection is only valid
+where the operation applies independently to every selected property. Navigation,
+field-configuration, and other single-target methods continue to require one direct
+property. Nested paths and computed expressions are rejected with a source-located
+definition diagnostic.
+
 ## Consequences
 
 - Definition APIs require careful compatibility management.

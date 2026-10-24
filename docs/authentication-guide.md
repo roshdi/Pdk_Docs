@@ -151,6 +151,48 @@ The same contributors work with the in-memory store and the ASP.NET Core Identit
 store. Password configuration values are development secrets and must not be
 committed to source control.
 
+## Enriching login claims and preferences
+
+Applications can add tenant, business-unit, warehouse, or other contextual values
+to a successful login without replacing PDK's `/auth/login` endpoint. Implement
+`ILoginContextContributor` and register it as scoped:
+
+```csharp
+public sealed class ApplicationLoginContextContributor(
+    ApplicationDbContext dbContext) : ILoginContextContributor
+{
+    public async Task ContributeAsync(LoginContext context, CancellationToken ct)
+    {
+        var settings = await dbContext.UserSettings
+            .SingleAsync(x => x.UserId == context.User.Id, ct);
+
+        context.SetClaim(
+            "application:business_unit_id",
+            settings.BusinessUnitId.ToString());
+        context.SetPreferences(JsonSerializer.Serialize(new
+        {
+            settings.WarehouseId
+        }));
+    }
+}
+
+builder.Services.AddScoped<
+    ILoginContextContributor,
+    ApplicationLoginContextContributor>();
+```
+
+Contributors execute after credentials and base claims are resolved, but before the
+session, cookie, and JWT are created. `SetClaim` replaces a single-valued claim,
+`AddClaim` appends a multi-valued claim, and `SetPreferences` writes the same JSON
+to both the preferences claim and the new session. Throw
+`LoginRejectedException` when a selected context is invalid for the user.
+
+The pipeline is credential-provider neutral. It works unchanged with
+`AddPdkInMemoryIdentity()` and with the ASP.NET Core Identity implementation.
+Multiple contributors run in dependency-injection registration order. A custom
+login endpoint is required only when the credential-validation workflow itself is
+different, such as migration of a legacy password hash.
+
 ## Authentication configuration
 
 Configuration is bound from the `Authentication` section:

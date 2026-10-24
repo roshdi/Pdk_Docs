@@ -24,6 +24,11 @@ deleted only when the stored hash still matches the file content, preserving
 developer-modified files. On each run the generator removes marked files under
 `src/` that were not produced by that run; no manifest is persisted.
 
+Generated form definitions and form page components/templates are also fully
+replaceable even though their route-facing filenames do not use a `.g` or `.base`
+suffix. The form controller (`*-form.controller.ts`) is their only hash-baselined,
+developer-customizable scaffold.
+
 Layout scaffolds are generated under `src/app/layouts/<name>/` from empty or
 non-empty templates and follow the same hash-baselined policy: `.ts`, `.html`,
 and `.scss` files carry their content-hash marker and are refreshed only while

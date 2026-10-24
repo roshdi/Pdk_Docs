@@ -46,12 +46,19 @@ service definitions, not complete deployable microservices.
 
 Generated service feature profiles use a cardinality-oriented query DSL. A default
 `HasGetItemQuery()` resolves by primary key, while `MatchBy(...)` supports unique
-business-key item queries, update commands, and upsert commands. An update without
-`MatchBy` retains its primary-key behavior. Commands and queries can use
+business-key item queries, required equality filters on list queries, update
+commands, and upsert commands. An update without `MatchBy` retains its primary-key
+behavior. Commands and queries can use
 `WithoutEndpoint()` when their generated handlers and contracts are needed only by
 internal application workflows. See the
 [Entity Feature and Capability Guide](docs/entity-capability-guide.md#feature-profile-dsl)
 for the complete reference.
+
+List queries can also use `FromProjection<TSource>()` to read an unmapped,
+flat LINQ result instead of a mapped table or view. PDK generates the normal
+query API; a developer-owned handler partial supplies the server-side query.
+See [Projection-backed list queries](docs/projection-queries.md) for examples,
+security considerations, and the difference from `From<TSource>()`.
 
 ## Quick Start
 
@@ -252,6 +259,8 @@ before adopting PDK in a production workflow.
 - [Architecture](docs/architecture/README.md)
 - [PDK CLI Guide](docs/pdk-cli-guide.md)
 - [Entity Feature and Capability Guide](docs/entity-capability-guide.md)
+- [Nested Command Orchestration](docs/nested-command-orchestration.md)
+- [Bulk Update and Delete Commands](docs/bulk-commands.md)
 - [Security and Authorization Developer Guide](docs/security-capability-guide.md)
 - [Authentication and Authorization Guide](docs/authentication-guide.md)
 - [Hybrid Cache Developer Guide](docs/cache-guide.md)

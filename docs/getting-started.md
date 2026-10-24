@@ -294,6 +294,7 @@ public sealed class OrderService : ServiceDefinition
 | `Dependencies(d => ...)` | Declare service-to-service dependencies |
 | `Security(s => ...)` | Configure authentication, row-level security, and identity service |
 | `HasSecurity<T>()` | Assign a security capability to an entity (see below) |
+| `HasPreferences<T>()` | Assign a session-preference filter/capability to an entity |
 
 #### Security DSL
 
@@ -343,6 +344,22 @@ effective scopes are OR-composed. Direct user denies override allowing roots tha
 depend on the denied permission. See the
 [Security and Authorization Developer Guide](security-capability-guide.md) for the
 complete model.
+
+#### Preference DSL
+
+Preferences represent the user's current session context rather than an authorization
+grant. Declare them separately so permission scopes and user selections cannot be
+confused:
+
+```csharp
+entities.Entity("Product")
+    .HasSecurity<IBasicSecurity>()
+    .HasPreferences<IWarehouseContextEntity>();
+```
+
+PDK intersects every `[PreferenceFilter]` predicate with the security-filtered query
+and applies the same rule to item, save, bulk, and import handlers. See the
+[Preference Capability Guide](preference-capability-guide.md).
 
 ## Define a Feature Profile
 
@@ -419,6 +436,55 @@ match. Match values identify the existing row, are excluded from generated updat
 mapping, and are not a mechanism for renaming
 that key—use separate existing/new fields in an explicit command for that workflow.
 `HasGetByIdQuery()` remains available as a compatibility alias.
+
+Bulk updates generate a POST endpoint, validation, a single-query handler, and a
+summary result. They use the primary key unless `MatchBy` declares one or more
+business-key fields:
+
+The full reference is available in
+[Bulk Update and Delete Commands](bulk-commands.md).
+
+```csharp
+HasBulkUpdateCommand("Activate")
+    .SharedUpdate(product => product.IsActive)
+    .ItemValidator<ActivateProductItemValidator>()
+    .OnValidationFailure(BulkFailureBehavior.SkipInvalidItems);
+
+HasBulkUpdateCommand("UpdatePrices")
+    .MatchBy(product => new { product.WarehouseId, product.Code })
+    .PerItemUpdate(product => product.Price)
+    .MaximumBatchSize(1000);
+```
+
+`SharedUpdate` sends the shared update fields directly on the request beside the
+ID or `matches` collection. `PerItemUpdate` sends an `items` array in which every
+item contains its match fields and its own update values. Override
+`CustomizeUpdateAsync` in the partial handler for additional domain behavior.
+
+An item validator implements
+`IValidator<BulkItemValidationContext<TEntity, TCommand>>`. Validation runs for
+all matched rows before mutation. `RollbackBatch` is the default and writes no
+rows if any item fails; `SkipInvalidItems` writes only valid rows. Generated
+results expose per-row FluentValidation failures and an aggregate summary.
+
+`WithConcurrency()` is supported by bulk update and bulk delete. It requires the
+entity to implement `IOptimisticConcurrency`, generates a concurrency value in
+every match/item, and rejects the complete batch with HTTP 409 if any submitted
+version is stale or its row is missing.
+
+Bulk delete follows the same matching rules:
+
+```csharp
+HasBulkDeleteCommand()
+    .MaximumBatchSize(5000);
+
+HasBulkDeleteCommand("RemoveByWarehouseCode")
+    .MatchBy(product => new { product.WarehouseId, product.Code });
+```
+
+It generates a POST `DeleteBulk` (or `{name}Bulk`) endpoint. Entities supporting
+`ISoftDelete` are soft-deleted; other entities are removed. Use the partial
+handler's `CustomizeDeleteAsync` hook for additional checks.
 
 Each `Has*` method returns a `CommandBuilder<T>` or `QueryBuilder<T>` for
 fluent field selection:
@@ -637,7 +703,7 @@ from the create command input but included in query results.
 
 | Method | Purpose |
 | --- | --- |
-| `IncludeNavigation(expr)` | Include a scalar navigation (many-to-one reference) |
+| `IncludeNavigation(expr, builder?, mapToEntity = true)` | Include a scalar navigation; disable entity mapping for nested-command input |
 | `IncludeDetail(expr, builder?)` | Include a collection navigation (one-to-many children) |
 | `ExcludeNavigation(expr)` | Exclude a navigation from the operation |
 

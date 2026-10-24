@@ -165,11 +165,87 @@ preserved. Cleanup runs only after successful generation, removes empty feature
 directories, and removes the obsolete API manifest. Developers must not edit `.g.cs`
 files.
 
+Generated save-command handlers register every collection declared through
+`IncludeDetail` by calling `AddDetail`; nested collection details are registered
+recursively. These registrations drive both EF eager loading and detail state
+processing. `SaveCommandHandler.CustomizeEntitySet` is the developer extension point
+for additional includes or query behavior. It runs after generated detail includes,
+so customization cannot accidentally discard the command's declared detail graph.
+
 Angular grid generation consumes validated grid and endpoint metadata through a
 deterministic CLI emitter. It writes definition, controller, page, and HTML artifacts
 below `src/app/generated/` using the marker and manifest ownership rules in ADR-005.
 Endpoint discovery supplies explicit query, request, service, and method names; the
 emitter does not rediscover them from generated TypeScript.
+
+Grid columns are convention-based. PDK includes scalar query properties by default,
+except properties originating from `IOptimisticConcurrency`. Primary-key properties
+remain in the generated definition for identity and command execution but start with
+`visible: false`. Generated membership order is: scalar properties marked with
+`NameField`, the individual `NameField` members of complex properties, remaining
+scalar properties, and explicitly included properties. Each generated column receives
+an order in increments of 100 (`100`, `200`, `300`, ...), leaving room for
+developer-owned TypeScript customization. A complex query property is included only
+when its contract contains at least one `NameField`. Each such member becomes a dotted
+column path; for example, `productGroup.code` and `productGroup.title` are generated as
+separate columns rather than rendering `productGroup` as one object column.
+Nested generated member names preserve the boundary with an underscore (for example,
+`productGroup_TitleColumn`) so they cannot collide with a scalar member such as
+`productGroupTitleColumn`; the runtime field remains `productGroup.title`.
+
+The C# grid-column DSL controls membership only:
+
+```csharp
+AddGrid<GetListProductQuery>("products", grid => grid.Columns(columns => columns
+    .Include(product => product.Description)
+    .Exclude(product => product.Version)));
+```
+
+`Include` adds a property omitted by convention, while `Exclude` always wins. Column
+order, width, sorting, filtering, and other presentation choices belong to the
+developer-owned TypeScript grid controller/definition customization. User settings
+persisted by the runtime are applied over those TypeScript defaults.
+
+Generated form fields use the same ordering convention: scalar properties marked
+with `NameField`, complex properties whose contract contains `NameField` members,
+remaining scalar properties, and explicitly included properties. Form field orders
+also use increments of 100 so TypeScript customization can insert fields between
+generated positions.
+
+Foreign-key form fields are inferred as reusable lookups when the load query exposes
+an unambiguous companion object. For example, `BrandId` plus a `Brand` DTO whose
+`BrandId` is marked `Key` and whose display members are marked `NameField` generates
+`brandField`, labelled `Brand`, while the field remains bound to `brandId`. The
+matching API feature must expose one conventional `getLookups` endpoint with the same
+key type. Generated lookup definitions are shared application artifacts under
+`src/app/lookups/{module}/{lookup}.lookup.ts`; the companion object supplies the
+initial selection without an extra resolve request.
+
+Inference is deliberately conservative. Missing or ambiguous companions, keys,
+display fields, services, or lookup endpoints leave the property as an ordinary
+input. Developers can select the intended lookup explicitly or suppress inference
+
+Enum-like form fields use one generated application model for native C# enums and
+Ardalis smart enums. Files are regenerated under
+`src/app/enums/{module}/{enum-name}.enum.ts`; they export a scalar `...Value` type
+for API transport and a `SmartEnum` subclass containing values and localization
+keys. Non-flags enum fields are conventionally rendered as selects unless an
+explicit input presentation is configured. `[Flags]` fields remain scalar by
+default.
+with an explicit input presentation:
+
+```csharp
+form.Field(x => x.BrandId, field => field.Lookup("catalog.brand"));
+form.Field(x => x.LegacyBrandId, field => field.Input("number"));
+```
+
+Generated grid definitions contain command instances, stable command IDs, key
+selectors, and placements, but no execution callbacks. Commands dispatch semantic
+intent to the grid controller. The generated controller base owns conventional
+relative create/view/update navigation and delete endpoint execution through a
+protected handler registry and overridable CRUD methods. This keeps Router and
+service behavior out of reusable command classes while preserving the developer-owned
+controller as the single workflow customization point.
 
 ## Runtime composition
 
