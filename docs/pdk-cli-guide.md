@@ -1,7 +1,8 @@
 # PDK CLI Guide
 
 The PDK CLI scaffolds and generates Prime Development Kit applications. This
-guide documents the currently supported workflow for creating a platform.
+guide documents platform scaffolding and platform, API, and UI generation. See
+[Current implementation status](implementation-status.md) for preview boundaries.
 
 ## Prerequisites
 
@@ -131,7 +132,7 @@ Sample/
     |   |-- Pdk.Sample.Catalog.Core/
     |   |   |-- Entities/
     |   |   |-- EntityConfigurations/
-    |   |   |-- Features/
+    |   |   |-- FeatureProfiles/
     |   |   `-- Pdk.Sample.Catalog.Core.csproj
     |   |-- Pdk.Sample.Catalog.Api/
     |   |-- Pdk.Sample.Catalog.Web/
@@ -141,7 +142,7 @@ Sample/
         |-- Pdk.Sample.Order.Core/
         |   |-- Entities/
         |   |-- EntityConfigurations/
-        |   |-- Features/
+        |   |-- FeatureProfiles/
         |   `-- Pdk.Sample.Order.Core.csproj
         |-- Pdk.Sample.Order.Api/
         |-- Pdk.Sample.Order.Web/
@@ -168,7 +169,7 @@ the naming convention `{RootNamespace}.{ServiceName}.{ProjectType}`:
 | Project | Purpose |
 | --- | --- |
 | `*.Core` | Service-specific core abstractions, entity models, and business logic interfaces. |
-| `*.Api` | Backend API features — commands, queries, handlers, and controllers. |
+| `*.Api` | Backend API features — commands, queries, handlers, and FastEndpoints endpoints. |
 | `*.Web` | ASP.NET Core host with `Program.cs` for configuring and running the application. |
 | `*.UnitTests` | Unit tests for the service. |
 | `*.IntegrationTests` | Integration tests for the service. |
@@ -278,7 +279,7 @@ public sealed class OrderService : ServiceDefinition
 ## Feature Profiles
 
 Each entity gets a `FeatureProfile<TEntity>` in the Core project's `Features/`
-folder. These profiles define which commands and queries are generated and
+folder (named `FeatureProfiles/`). These profiles define which commands and queries are generated and
 which fields are included:
 
 ```csharp
@@ -507,7 +508,8 @@ The hash covers the file body without the marker. PDK normalizes the UTF-8 BOM a
 line endings before hashing, but treats formatting and whitespace edits as developer
 changes. The preceding two-line marker/hash format remains readable for compatibility.
 The retired `.pdk/generate-api.manifest.json` is removed after successful cleanup;
-Angular generation continues to use its separate UI manifest policy. Feature-module
+Angular cleanup likewise uses file markers and content hashes, with no persisted
+manifest; legacy UI manifests are removed during cleanup. Feature-module
 TypeScript and HTML structure is owned by the Scriban templates under
 `src/Pdk.Cli/Templates/AngularApp/src/app/modules/`. The C# Angular grid generator
 prepares validated template models and applies generated-file ownership policy; it
@@ -522,20 +524,42 @@ The `pdk metadata export` command exports the application metadata to
 pdk metadata export <assembly-path>
 ```
 
-The assembly path can be either the Platform or Core assembly. The command
-discovers all entities, their capabilities, and feature profiles, then
-writes a JSON metadata file.
+Use a compiled service Core assembly containing a discoverable DbContext. The
+experimental discovery path inspects its EF model and feature profiles, then writes
+the JSON file in the current working directory. It currently constructs discovery
+options with SQL Server; it is not a general export of a `PlatformDefinition`
+assembly and does not guarantee compatibility with every provider or constructor.
 
 ### Add a service
 
-The `pdk add service` command adds a new service to an existing platform:
+The `pdk add service` command is currently a placeholder:
 
 ```shell
 pdk add service <name>
 ```
 
-This creates a new `ServiceDefinition` class in the Platform project and
-registers it in `PlatformDefinition.cs`.
+It prints guidance and does not create or register a service. To add one, create a
+`ServiceDefinition` class in the Platform project, register it with
+`Services(services => services.Add<TService>())`, and rebuild the Platform project
+or run `pdk generate platform`.
+
+### Generate a UI application
+
+```shell
+pdk generate ui <application-assembly-path> <application-project-directory>
+```
+
+The compiled assembly must contain exactly one concrete `WebApplicationDefinition`.
+The command initializes and validates its module graph, discovers layouts and pages,
+and generates an Angular workspace alongside the definition project. Generated UI
+definition projects invoke the same command during builds.
+
+The workflow emits API clients, grids, forms, lookups, enums, and resources from the
+registered modules. Current API client/component generation errors may be printed
+as warnings without making the command fail; inspect command output and build the
+Angular workspace before treating generation as verified. See the
+[architecture reference](architecture/README.md#generation-lifecycle) for ownership
+and customization rules.
 
 ### Direct API command
 

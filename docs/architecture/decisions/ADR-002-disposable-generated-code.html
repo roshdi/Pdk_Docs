@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADR-002-disposable-generated-code</title>
+  <link rel="stylesheet" href="../../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>ADR-002: Generated Code Is Disposable</h1>
+<ul>
+<li>Status: Accepted</li>
+<li>Date: 2026-07-17</li>
+</ul>
+<h2>Context</h2>
+<p>PDK must regenerate infrastructure as definitions and generators evolve. If
+developers edit generated files, regeneration can overwrite business behavior
+or require unreliable source merging.</p>
+<h2>Decision</h2>
+<p>Generated files must never be manually edited. They are disposable artifacts
+that can be deleted and recreated from definitions.</p>
+<p>Developer-owned behavior must live in clearly separate partial classes,
+companion files, or explicit extension points that generation does not overwrite.
+Generated files must carry a recognizable marker where the file format permits.</p>
+<h2>Consequences</h2>
+<ul>
+<li>Generators may replace generated files without preserving local edits.</li>
+<li>Generated and developer-owned file naming must be unambiguous.</li>
+<li>New generated behavior must expose stable extension points where customization is expected.</li>
+<li>Cleanup logic may delete only artifacts positively identified as generated.</li>
+<li>Documentation must teach developers where custom behavior belongs.</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<h3>Preserve edits through text merging</h3>
+<p>Rejected because arbitrary source merging is fragile and makes output dependent
+on generation history.</p>
+<h3>Generate files only once</h3>
+<p>Rejected because created-once infrastructure cannot safely evolve with metadata
+or generator improvements.</p>
+<h3>Allow selected generated files to become developer-owned</h3>
+<p>Rejected as a default because ownership becomes ambiguous. Explicit companion
+templates may be created once, but those files must be identified as
+developer-owned from creation.</p>
+
+  </article>
+</body>
+</html>

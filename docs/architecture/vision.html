@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vision</title>
+  <link rel="stylesheet" href="../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>PDK Vision</h1>
+<h2>Mission</h2>
+<p>Prime Development Kit is an enterprise .NET development platform that removes
+repeatable application infrastructure from day-to-day product development.
+Teams describe application structure with strongly typed metadata, and PDK
+generates the consistent infrastructure needed to implement that structure.</p>
+<p>PDK enables developers to spend their time on domain behavior and business
+rules instead of recreating projects, APIs, persistence plumbing, contracts,
+permissions, mappings, and user-interface metadata.</p>
+<h2>Primary Audience</h2>
+<p>PDK is primarily designed for enterprise .NET teams building long-lived
+business applications. These teams typically need:</p>
+<ul>
+<li>Consistency across services and contributors</li>
+<li>Repeatable architectural boundaries</li>
+<li>Strong typing and compile-time feedback</li>
+<li>Safe regeneration as applications evolve</li>
+<li>A clear separation between infrastructure and business behavior</li>
+</ul>
+<p>PDK may also support architects and platform engineering teams, but their needs
+must serve the primary goal of improving enterprise application delivery.</p>
+<h2>Product Identity</h2>
+<p>PDK is a development platform, not only a code generator or runtime framework.
+It combines:</p>
+<ul>
+<li>Definition libraries for describing platforms, services, entities, and capabilities</li>
+<li>Discovery and metadata processing</li>
+<li>Project and source-code generation</li>
+<li>CLI and build integration</li>
+<li>Runtime libraries used by generated applications</li>
+<li>Conventions for backend services and metadata-driven user interfaces</li>
+</ul>
+<p>These parts should form one coherent developer workflow.</p>
+<h3>Generation Lifecycle</h3>
+<p><code>pdk new platform</code> creates the platform solution and its Platform project. The
+Platform project owns the strongly typed platform definition. After that project
+builds, its MSBuild target invokes <code>pdk generate api &lt;assemblyPath&gt; &lt;projectPath&gt;</code>.
+The CLI loads the compiled definition by reflection, validates it, and generates
+or updates the Core and API projects for every registered built-in and business
+service. The generated service projects are added to both the platform solution
+and their service solution. Rebuilding the Platform project repeats this process,
+keeping generated structure synchronized with the definition while preserving
+developer-owned files.</p>
+<h2>Goals</h2>
+<p>PDK should:</p>
+<ol>
+<li>Eliminate repetitive infrastructure code through metadata-driven generation.</li>
+<li>Enforce consistent architectural conventions across applications and teams.</li>
+<li>Keep application structure strongly typed, discoverable, and reviewable in code.</li>
+<li>Make generated infrastructure safe to discard and regenerate.</li>
+<li>Keep business logic in developer-owned code.</li>
+<li>Support equivalent explicit CLI and build-integrated generation workflows.</li>
+<li>Preserve compatibility of platform definitions as PDK evolves.</li>
+</ol>
+<h2>Non-Goals</h2>
+<p>PDK does not generate business rules or domain behavior. Generated code may
+provide extension points, base implementations, and infrastructure, but the
+meaning and behavior of the business domain remain developer-owned.</p>
+<p>PDK is intentionally opinionated. Supporting every possible application
+architecture is less important than providing a coherent and productive model
+for its chosen architecture.</p>
+<h2>Success Criteria</h2>
+<p>PDK is successful when:</p>
+<ul>
+<li>A business capability can be described with substantially less infrastructure code.</li>
+<li>Generated services follow the same conventions without manual enforcement.</li>
+<li>Regeneration does not destroy handwritten behavior.</li>
+<li>Definitions remain understandable without reading generated output.</li>
+<li>Developers receive useful failures when definitions are incomplete or invalid.</li>
+<li>CLI and build generation produce equivalent results from the same definitions.</li>
+</ul>
+
+  </article>
+</body>
+</html>

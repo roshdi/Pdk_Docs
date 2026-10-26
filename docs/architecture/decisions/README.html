@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>README</title>
+  <link rel="stylesheet" href="../../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>Architecture Decision Records</h1>
+<p>Architecture Decision Records (ADRs) preserve the context and consequences of
+significant PDK decisions.</p>
+<h2>Rules</h2>
+<ol>
+<li>Use the next available three-digit number.</li>
+<li>Use a short lowercase filename: <code>ADR-NNN-description.md</code>.</li>
+<li>Start new records as <strong>Proposed</strong>.</li>
+<li>Change the status to <strong>Accepted</strong> or <strong>Rejected</strong> after a decision.</li>
+<li>Do not rewrite an accepted decision to change history.</li>
+<li>Replace an accepted decision by adding a new ADR and marking the old one <strong>Superseded by ADR-NNN</strong>.</li>
+</ol>
+<h2>Template</h2>
+<pre><code class="language-markdown"># ADR-NNN: Decision Title
+
+- Status: Proposed
+- Date: YYYY-MM-DD
+
+## Context
+
+What problem or constraint requires a decision?
+
+## Decision
+
+What approach will PDK adopt?
+
+## Consequences
+
+What becomes easier, harder, required, or prohibited?
+
+## Alternatives Considered
+
+Which credible alternatives were rejected, and why?
+</code></pre>
+<h2>Decision Index</h2>
+<table>
+<thead>
+<tr>
+<th>ADR</th>
+<th>Status</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="ADR-001-strongly-typed-definitions.html">ADR-001</a></td>
+<td>Accepted</td>
+<td>Strongly typed definitions are the structural source of truth</td>
+</tr>
+<tr>
+<td><a href="ADR-002-disposable-generated-code.html">ADR-002</a></td>
+<td>Accepted</td>
+<td>Generated code is disposable and must not be edited</td>
+</tr>
+<tr>
+<td><a href="ADR-003-cli-and-build-generation.html">ADR-003</a></td>
+<td>Accepted</td>
+<td>CLI and build-time generation are both supported and equivalent</td>
+</tr>
+</tbody></table>
+
+  </article>
+</body>
+</html>

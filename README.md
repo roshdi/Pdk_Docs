@@ -5,9 +5,9 @@
 [![NuGet Pdk.Cli](https://img.shields.io/nuget/v/Pdk.Cli.svg?label=Pdk.Cli)](https://www.nuget.org/packages/Pdk.Cli)
 
 > [!IMPORTANT]
-> PDK is an early preview targeting .NET 10. Platform definitions and platform
-> scaffolding are available, while service/API generation and frontend support
-> are still under development.
+> PDK is an early preview targeting .NET 10. Platform, service/API, and Angular
+> generation are implemented, but their contracts and provider coverage are still
+> evolving. See the [current implementation status](docs/implementation-status.md).
 
 Prime Development Kit is an opinionated .NET development platform for describing
 enterprise applications with strongly typed metadata and generating repeatable
@@ -23,7 +23,7 @@ PDK separates application structure from application behavior:
   recreated from definitions; companion partials preserve developer customization.
 
 The architectural direction combines microservice boundaries, vertical slices,
-metadata-driven generation, and eventually metadata-driven Angular UI support.
+metadata-driven generation, and metadata-driven Angular UI support.
 See the [architecture reference](docs/architecture/README.md) for accepted
 principles and decisions.
 
@@ -39,10 +39,16 @@ The current preview provides:
 - Structured diagnostics for invalid definitions
 - A .NET tool that scaffolds a platform solution with `pdk new platform`
 - Runtime abstractions built around Entity Framework Core
+- Service Core/API/Web/test project generation and combined platform hosting
+- Commands, queries, validators, endpoints, bulk operations, and Excel imports
+- Built-in Identity authentication, structured authorization, and login sessions
+- Angular workspace, API client, grid, form, lookup, and enum generation
 
-The generated platform scaffold contains Core, Platform, Shared, and Contracts
-projects. Selected built-in and business services are currently generated as
-service definitions, not complete deployable microservices.
+The initial platform scaffold contains Core, Platform, Shared, and Contracts
+projects. Building the Platform project generates registered service projects and
+the combined Web host. Service Core builds generate APIs; registered UI application
+definition builds generate Angular output. Developer-owned code supplies domain
+behavior, and deployment configuration remains application work.
 
 Generated service feature profiles use a cardinality-oriented query DSL. A default
 `HasGetItemQuery()` resolves by primary key, while `MatchBy(...)` supports unique
@@ -202,14 +208,17 @@ Read the full [architecture principles](docs/architecture/principles.md) and
 
 | Project | Purpose | Status |
 | --- | --- | --- |
-| `Pdk.Core` | Runtime abstractions, entity capabilities, request context, and security primitives | Preview |
+| `Pdk.Core` | Runtime abstractions, EF Core base context, entity capabilities, request context, and security primitives | Preview |
+| `Pdk.Api` | FastEndpoints integration, command/query handlers, authentication endpoints, and Excel import | Preview |
+| `Pdk.Identity` | ASP.NET Core Identity persistence, authorization administration, and sessions | Preview |
+| `Pdk.Files` | File and file-link persistence models | Preview; limited scope |
 | `Pdk.Cache` | Provider-neutral memory/distributed hybrid cache and invalidation contracts | Preview |
 | `Pdk.Definitions` | Strongly typed platform, service, entity, and diagnostic metadata APIs | Preview |
-| `Pdk.Cli` | CLI commands, project scaffolding, templates, and discovery infrastructure | Platform scaffolding available |
-| `Pdk.Data` | Shared persistence integration | Placeholder |
-| `Pdk.Data.SqlServer` | SQL Server persistence provider | Placeholder |
-| `Pdk.Data.PostgreSQL` | PostgreSQL persistence provider | Placeholder |
-| `Pdk.Data.Oracle` | Oracle persistence provider | Placeholder |
+| `Pdk.Cli` | Platform, service/API, and Angular generators, templates, and discovery | Preview |
+| `Pdk.Data` | EF Core package integration; shared base context lives in `Pdk.Core` | Minimal package |
+| `Pdk.Data.SqlServer` | SQL Server configuration and concurrency mapping | Preview |
+| `Pdk.Data.PostgreSQL` | PostgreSQL concurrency mapping | Preview |
+| `Pdk.Data.Oracle` | Oracle concurrency mapping | Preview |
 
 ## Libraries
 
@@ -229,12 +238,13 @@ Read the full [architecture principles](docs/architecture/principles.md) and
 
 Tests use xUnit, FluentAssertions, and coverlet.
 
-### Planned Application Stack
+### Application Stack and Remaining Integrations
 
-The architectural roadmap includes FastEndpoints, FluentValidation,
-Riok.Mapperly, QueryKit, MassTransit, OpenTelemetry, Angular, and PrimeNG. These
-libraries are not all integrated into active generators yet and may change as
-the related architecture decisions are completed.
+API generation and runtime code use FastEndpoints, FluentValidation,
+Riok.Mapperly, and QueryKit. Angular and PrimeNG are used by generated UI workspaces.
+Messaging and observability selections, including MassTransit-oriented messaging
+and OpenTelemetry, still require further integration. Provider and subsystem
+coverage is summarized in the [implementation status](docs/implementation-status.md).
 
 ## Preview Status
 
@@ -243,13 +253,14 @@ the related architecture decisions are completed.
 | Platform scaffolding with `pdk new platform` | Available |
 | Platform/service/entity definition APIs | Preview |
 | Definition diagnostics | Preview |
-| Service project and API generation | In development |
+| Service project and API generation | Preview; implemented |
 | Metadata export | Experimental |
-| Provider-specific persistence generation | Planned |
-| Angular and PrimeNG UI generation | Planned |
+| Provider-specific persistence generation | Preview; coverage varies by provider |
+| Built-in Identity and sessions | Preview; implemented |
+| Angular and PrimeNG UI generation | Preview; implemented |
 | Deployment generation | Planned |
 
-Commands other than `pdk new platform` may be incomplete during the preview.
+`pdk add service` and `pdk entity` are incomplete during the preview.
 Review the [Getting Started limitations](docs/getting-started.md#current-preview-limitations)
 before adopting PDK in a production workflow.
 
@@ -257,6 +268,7 @@ before adopting PDK in a production workflow.
 
 - [Getting Started](docs/getting-started.md)
 - [Architecture](docs/architecture/README.md)
+- [Current implementation status](docs/implementation-status.md)
 - [PDK CLI Guide](docs/pdk-cli-guide.md)
 - [Entity Feature and Capability Guide](docs/entity-capability-guide.md)
 - [Nested Command Orchestration](docs/nested-command-orchestration.md)
@@ -264,6 +276,9 @@ before adopting PDK in a production workflow.
 - [Security and Authorization Developer Guide](docs/security-capability-guide.md)
 - [Authentication and Authorization Guide](docs/authentication-guide.md)
 - [Hybrid Cache Developer Guide](docs/cache-guide.md)
+- [Preference Capability Guide](docs/preference-capability-guide.md)
+- [Projection-backed List Queries](docs/projection-queries.md)
+- [Excel Mapping Profiles](docs/excel-mapping-profiles.md)
 - [PDK and AI Code Generation](docs/pdk-vs-ai-code-generation.md)
 
 ## Build and Test

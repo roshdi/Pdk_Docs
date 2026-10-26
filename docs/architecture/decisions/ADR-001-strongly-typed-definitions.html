@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADR-001-strongly-typed-definitions</title>
+  <link rel="stylesheet" href="../../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>ADR-001: Strongly Typed Definitions Are the Structural Source of Truth</h1>
+<ul>
+<li>Status: Accepted</li>
+<li>Date: 2026-07-17</li>
+</ul>
+<h2>Context</h2>
+<p>PDK needs one authoritative representation of application structure. Possible
+sources include C# definitions, external configuration files, domain-model
+reflection, and generated output. Multiple authoritative sources would create
+conflicts and make generation difficult to validate or reproduce.</p>
+<p>Enterprise .NET teams benefit from compile-time feedback, refactoring support,
+code review, and discoverable APIs.</p>
+<h2>Decision</h2>
+<p>Strongly typed C# definitions are the source of truth for platform, service,
+entity, and capability structure.</p>
+<p>PDK discovers these definitions, validates them, and builds a unified metadata
+model. Generators and runtime integration consume that metadata. External
+configuration may supply environment-specific values but does not redefine the
+structural model.</p>
+<h2>Consequences</h2>
+<ul>
+<li>Definition APIs require careful compatibility management.</li>
+<li>Invalid structure can be diagnosed before generation.</li>
+<li>IDE navigation, refactoring, and type checking improve the authoring experience.</li>
+<li>Generators must not infer competing structural truth from generated files.</li>
+<li>External formats may import or export metadata but remain derived representations.</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<h3>YAML or JSON as the primary source</h3>
+<p>Rejected because it provides weaker typing and refactoring support and creates a
+separate schema and tooling burden.</p>
+<h3>Domain classes as the primary source</h3>
+<p>Rejected because persistence-oriented domain types do not express the complete
+platform, service, security, generation, and UI model.</p>
+<h3>Hybrid authority</h3>
+<p>Rejected because conflicting sources require precedence rules and reduce
+determinism.</p>
+
+  </article>
+</body>
+</html>

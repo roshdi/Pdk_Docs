@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>security-capability-guide</title>
+  <link rel="stylesheet" href="github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>Security Capabilities</h1>
+<h2>Overview</h2>
+<p>PDK provides a metadata-driven security model for implementing both <strong>permission-based authorization</strong> and <strong>row-level security</strong>.</p>
+<p>Instead of writing authorization logic inside every query, command, or repository, security is declared as <strong>reusable capabilities</strong> using C# interfaces.</p>
+<p>A security capability defines:</p>
+<ul>
+<li>Default permissions generated for the entity.</li>
+<li>Available permission scopes.</li>
+<li>Optional row-level security filters.</li>
+<li>Metadata that can be consumed by generators and administration UI.</li>
+</ul>
+<p>This allows the same security capability to be shared by many entities while keeping the implementation centralized.</p>
+<hr>
+<h1>Security Model</h1>
+<p>PDK separates authorization into two independent concepts.</p>
+<h2>Permission</h2>
+<p>A permission determines <strong>what operation</strong> a user is allowed to perform.</p>
+<p>Examples:</p>
+<ul>
+<li>Customer.Read</li>
+<li>Customer.Create</li>
+<li>Customer.Update</li>
+<li>Customer.Delete</li>
+</ul>
+<p>Permissions are generated automatically from the implemented security capability.</p>
+<hr>
+<h2>Scope</h2>
+<p>A scope determines <strong>which records</strong> are accessible.</p>
+<p>Examples:</p>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>Scope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Customer.Read</td>
+<td>All</td>
+</tr>
+<tr>
+<td>Customer.Read</td>
+<td>Owner</td>
+</tr>
+<tr>
+<td>Customer.Read</td>
+<td>Unit</td>
+</tr>
+<tr>
+<td>Customer.Read</td>
+<td>Warehouse</td>
+</tr>
+</tbody></table>
+<p>A permission without a valid scope does not grant access to any records.</p>
+<hr>
+<h2>Security Grant</h2>
+<p>For scoped permissions, PDK stores additional constraint values inside a <code>SecurityGrant</code>.</p>
+<p>Examples:</p>
+<h3>Unit Security</h3>
+<pre><code class="language-json">{
+    &quot;values&quot;:[1,3,5]
+}
+</code></pre>
+<p>User can access only units:</p>
+<ul>
+<li>1</li>
+<li>3</li>
+<li>5</li>
+</ul>
+<hr>
+<h3>Warehouse Security</h3>
+<pre><code class="language-json">[
+    {
+        &quot;values1&quot;:[1],
+        &quot;values2&quot;:[1,2]
+    },
+    {
+        &quot;values1&quot;:[2],
+        &quot;values2&quot;:[2,3]
+    }
+]
+</code></pre>
+<p>Meaning:</p>
+<ul>
+<li>Warehouse 1 → Document Types 1 and 2</li>
+<li>Warehouse 2 → Document Types 2 and 3</li>
+</ul>
+<p>Each object represents one logical rule.</p>
+<p>Multiple rules are combined using <strong>OR</strong>.</p>
+<p>Values inside one rule are combined using <strong>AND</strong>.</p>
+<p>Equivalent SQL:</p>
+<pre><code class="language-sql">(
+    WarehouseId = 1
+    AND
+    DocumentType IN (1,2)
+)
+OR
+(
+    WarehouseId = 2
+    AND
+    DocumentType IN (2,3)
+)
+</code></pre>
+<hr>
+<h1>Creating a Security Capability</h1>
+<p>Every security capability implements <code>ISecurity</code>.</p>
+<p>A capability can be shared by many entities across the platform.</p>
+<hr>
+<h1>Basic Security</h1>
+<p>Basic security only controls permissions and does not apply row-level filtering.</p>
+<pre><code class="language-csharp">public interface IBasicSecurity : ISecurity
+{
+    static string[] ISecurity.GetDefaultPermissions()
+    {
+        return [&quot;Read&quot;, &quot;Create&quot;, &quot;Update&quot;, &quot;Delete&quot;];
+    }
+
+    static SecurityScopeDefinition[] ISecurity.GetAvailableScopes()
+    {
+        return
+        [
+            SecurityScopes.None,
+            SecurityScopes.All
+        ];
+    }
+}
+</code></pre>
+<p>This capability provides two scopes:</p>
+<ul>
+<li>None</li>
+<li>All</li>
+</ul>
+<p>No row filter is required.</p>
+<hr>
+<h1>Owner Security</h1>
+<p>Owner security restricts records to the current authenticated user.</p>
+<p>Entities implementing this capability must expose an <code>OwnerId</code> property.</p>
+<pre><code class="language-csharp">public interface IOwnedSecurity : ISecurity, ICreated
+{
+    AuthId OwnerId { get; set; }
+
+    static string[] ISecurity.GetDefaultPermissions()
+    {
+        return [&quot;Read&quot;, &quot;Create&quot;, &quot;Update&quot;, &quot;Delete&quot;];
+    }
+
+    static SecurityScopeDefinition[] ISecurity.GetAvailableScopes()
+    {
+        return
+        [
+            SecurityScopes.None,
+            SecurityScopes.Owner,
+            SecurityScopes.All
+        ];
+    }
+
+    void ICreated.SetCreated(IRequestContext context)
+    {
+        OwnerId = context.Auth.CurrentUserId;
+    }
+
+    [SecurityFilter]
+    static Expression&lt;Func&lt;T,bool&gt;&gt; OwnerFilter&lt;T&gt;(
+        IRequestContext context)
+        where T : IOwnedSecurity
+    {
+        var currentUserId = context.Auth.CurrentUserId;
+
+        return e =&gt; e.OwnerId == currentUserId;
+    }
+}
+</code></pre>
+<p>Generated SQL:</p>
+<pre><code class="language-sql">WHERE OwnerId = CurrentUserId
+</code></pre>
+<hr>
+<h1>Unit Security</h1>
+<p>Unit security restricts data using one security dimension.</p>
+<pre><code class="language-csharp">public interface IUnitSecurity : ISecurity
+{
+    long UnitId { get; set; }
+
+    static string[] ISecurity.GetDefaultPermissions()
+    {
+        return [&quot;Read&quot;, &quot;Create&quot;, &quot;Update&quot;, &quot;Delete&quot;];
+    }
+
+    static SecurityScopeDefinition[] ISecurity.GetAvailableScopes()
+    {
+        return
+        [
+            SecurityScopes.None,
+            SecurityScopes.Unit,
+            SecurityScopes.All
+        ];
+    }
+
+    [SecurityFilter]
+    static Expression&lt;Func&lt;T,bool&gt;&gt; UnitFilter&lt;T&gt;(
+        IRequestContext context,
+        SecurityGrant securityGrant)
+        where T : IUnitSecurity
+    {
+        return securityGrant
+            .GetSecurityConstraints&lt;long&gt;()
+            .CreateFilter()
+            .WithParameter&lt;T&gt;(e =&gt; e.UnitId);
+    }
+}
+</code></pre>
+<p>Generated SQL:</p>
+<pre><code class="language-sql">WHERE UnitId IN (...)
+</code></pre>
+<hr>
+<h1>Warehouse Security</h1>
+<p>Warehouse security demonstrates multiple security dimensions.</p>
+<pre><code class="language-csharp">public interface IWarehouseSecurity : ISecurity
+{
+    long WarehouseId { get; set; }
+
+    int DocumentType { get; set; }
+
+    static string[] ISecurity.GetDefaultPermissions()
+    {
+        return [&quot;Read&quot;, &quot;Create&quot;, &quot;Update&quot;, &quot;Delete&quot;];
+    }
+
+    static SecurityScopeDefinition[] ISecurity.GetAvailableScopes()
+    {
+        return
+        [
+            SecurityScopes.None,
+            SecurityScopes.Warehouse,
+            SecurityScopes.All
+        ];
+    }
+
+    [SecurityFilter]
+    static Expression&lt;Func&lt;T,bool&gt;&gt; WarehouseFilter&lt;T&gt;(
+        IRequestContext context,
+        SecurityGrant securityGrant)
+        where T : IWarehouseSecurity
+    {
+        return securityGrant
+            .GetSecurityConstraints&lt;long,int&gt;()
+            .CreateFilter()
+            .WithParameters&lt;T&gt;(
+                e =&gt; e.WarehouseId,
+                e =&gt; e.DocumentType);
+    }
+}
+</code></pre>
+<p>Generated SQL:</p>
+<pre><code class="language-sql">(
+    WarehouseId = 1
+    AND
+    DocumentType IN (1,2)
+)
+OR
+(
+    WarehouseId = 2
+    AND
+    DocumentType IN (2,3)
+)
+</code></pre>
+<hr>
+<h1>Applying a Security Capability</h1>
+<p>Simply implement the desired interface.</p>
+<pre><code class="language-csharp">public class WarehouseDocument :
+    Entity,
+    IWarehouseSecurity
+{
+    public long WarehouseId { get; set; }
+
+    public int DocumentType { get; set; }
+
+    ...
+}
+</code></pre>
+<p>No additional configuration is required.</p>
+<hr>
+<h1>SecurityFilter Attribute</h1>
+<p>Methods decorated with <code>SecurityFilterAttribute</code> are discovered automatically by PDK.</p>
+<p>The generated filter is applied to every secured query.</p>
+<pre><code class="language-csharp">[SecurityFilter]
+static Expression&lt;Func&lt;T,bool&gt;&gt; Filter&lt;T&gt;(...)
+</code></pre>
+<p>The method must:</p>
+<ul>
+<li>Be static</li>
+<li>Return <code>Expression&lt;Func&lt;T,bool&gt;&gt;</code></li>
+<li>Be generic</li>
+<li>Constrain <code>T</code> to the implemented security capability</li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-csharp">where T : IUnitSecurity
+</code></pre>
+<hr>
+<h1>SecurityConstraint Helpers</h1>
+<p>PDK provides helper classes for building EF Core compatible expressions.</p>
+<p>Single dimension:</p>
+<pre><code class="language-csharp">securityGrant
+    .GetSecurityConstraints&lt;long&gt;()
+    .CreateFilter()
+    .WithParameter&lt;T&gt;(e =&gt; e.UnitId);
+</code></pre>
+<p>Two dimensions:</p>
+<pre><code class="language-csharp">securityGrant
+    .GetSecurityConstraints&lt;long,int&gt;()
+    .CreateFilter()
+    .WithParameters&lt;T&gt;(
+        e =&gt; e.WarehouseId,
+        e =&gt; e.DocumentType);
+</code></pre>
+<p>Three dimensions:</p>
+<pre><code class="language-csharp">securityGrant
+    .GetSecurityConstraints&lt;long,int,Guid&gt;()
+    .CreateFilter()
+    .WithParameters&lt;T&gt;(
+        e =&gt; e.CompanyId,
+        e =&gt; e.WarehouseId,
+        e =&gt; e.DocumentType);
+</code></pre>
+<p>These builders generate expression trees that are fully translatable by Entity Framework Core.</p>
+<hr>
+<h1>Creating Custom Security Capabilities</h1>
+<p>Developers can create custom capabilities for any business requirement.</p>
+<p>Example:</p>
+<pre><code class="language-csharp">public interface IProjectSecurity : ISecurity
+{
+    Guid ProjectId { get; set; }
+
+    static string[] ISecurity.GetDefaultPermissions()
+    {
+        return [&quot;Read&quot;, &quot;Create&quot;, &quot;Update&quot;, &quot;Delete&quot;];
+    }
+
+    static SecurityScopeDefinition[] ISecurity.GetAvailableScopes()
+    {
+        return
+        [
+            SecurityScopes.None,
+            SecurityScopes.Project,
+            SecurityScopes.All
+        ];
+    }
+
+    [SecurityFilter]
+    static Expression&lt;Func&lt;T,bool&gt;&gt; ProjectFilter&lt;T&gt;(
+        IRequestContext context,
+        SecurityGrant securityGrant)
+        where T : IProjectSecurity
+    {
+        return securityGrant
+            .GetSecurityConstraints&lt;Guid&gt;()
+            .CreateFilter()
+            .WithParameter&lt;T&gt;(e =&gt; e.ProjectId);
+    }
+}
+</code></pre>
+<hr>
+<h1>Best Practices</h1>
+<ul>
+<li>Keep security capabilities small and reusable.</li>
+<li>Share capabilities across entities whenever possible.</li>
+<li>Prefer reusable security interfaces over writing filters inside queries.</li>
+<li>Use <code>SecurityConstraint</code> builders instead of manually building expression trees.</li>
+<li>Keep security logic inside the capability interface, not inside repositories.</li>
+<li>Model each independent security dimension as a separate property.</li>
+<li>Use multi-dimensional constraints only when security values are correlated.</li>
+</ul>
+<hr>
+<h1>Benefits</h1>
+<p>Using security capabilities provides:</p>
+<ul>
+<li>Centralized authorization logic</li>
+<li>Reusable row-level security</li>
+<li>Automatic permission generation</li>
+<li>EF Core compatible filters</li>
+<li>Strongly typed security expressions</li>
+<li>Metadata suitable for code generation</li>
+<li>Consistent security implementation across all microservices</li>
+<li>Simplified maintenance and testing</li>
+</ul>
+
+  </article>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>principles</title>
+  <link rel="stylesheet" href="../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>PDK Architecture Principles</h1>
+<p>These principles guide implementation and review decisions. A change that
+conflicts with a principle should include an explicit architecture discussion
+and, when accepted, an ADR.</p>
+<h2>1. Definitions Own Structure</h2>
+<p>Strongly typed C# definitions are the authoritative description of platform,
+service, entity, and capability structure. Generated output and runtime
+reflection are derived from those definitions.</p>
+<p>Definitions should be concise, composable, discoverable, and validated with
+actionable diagnostics.</p>
+<h2>2. Code Owns Behavior</h2>
+<p>Business rules and domain behavior belong in handwritten code. Definitions may
+declare capabilities and generated infrastructure may invoke extension points,
+but generation must not invent business decisions.</p>
+<h2>3. Generated Code Is Disposable</h2>
+<p>Developers do not edit generated files. Any generated artifact may be deleted
+and recreated from definitions without losing developer-owned behavior.</p>
+<p>Generated and handwritten files must be clearly distinguishable.</p>
+<h2>4. Stable Extension Points Protect Handwritten Code</h2>
+<p>Custom behavior belongs in partial classes, companion files, or other explicitly
+developer-owned extension points. Regeneration must not overwrite these files.</p>
+<p>An extension point should have a clear lifecycle and a stable contract.</p>
+<h2>5. Convention Over Structural Choice</h2>
+<p>PDK uses strong conventions for microservice boundaries, vertical slices,
+project layout, naming, and generated artifacts. Configuration should express
+business and infrastructure intent rather than reconstructing the architecture.</p>
+<p>Overrides should exist only where real application variation justifies them.</p>
+<h2>6. One Metadata Model Drives All Outputs</h2>
+<p>Discovery and validation should produce a unified metadata model. Backend code,
+contracts, persistence artifacts, documentation, and UI metadata should derive
+from that model instead of implementing independent interpretations.</p>
+<h2>7. CLI and Build Generation Are Equivalent</h2>
+<p>Explicit CLI generation and build-integrated generation must consume the same
+definitions, validation rules, metadata pipeline, and generators. Invocation
+method must not change generated results.</p>
+<h2>8. Diagnostics Before Generation</h2>
+<p>Invalid definitions should produce stable, actionable diagnostics before files
+are generated. Expected definition errors should be collected where possible
+rather than reported as unrelated runtime exceptions.</p>
+<h2>9. Regeneration Is Deterministic and Idempotent</h2>
+<p>The same definitions and PDK version should produce the same output. Repeating
+generation should not modify unchanged files or create duplicate declarations.</p>
+<p>Obsolete generated artifacts should be removed safely without touching
+developer-owned files.</p>
+<h2>10. Definition Compatibility Has Priority</h2>
+<p>As PDK evolves, compatibility of existing definitions is the primary stability
+goal. Generated implementation details may evolve when definitions retain their
+meaning and regeneration remains safe.</p>
+<p>Breaking definition changes require explicit migration guidance and an ADR.</p>
+<h2>11. Strong Typing Over String Conventions</h2>
+<p>Public definition APIs should prefer types, generic constraints, and validated
+value objects over unvalidated strings. Strings remain appropriate for names,
+display text, and external identifiers when no stronger model is justified.</p>
+<h2>12. Minimal Definitions, Rich Derived Metadata</h2>
+<p>Developers should state intent once. PDK should derive conventional names,
+defaults, and related metadata instead of requiring repetitive declarations.
+Derived behavior must remain predictable and inspectable.</p>
+
+  </article>
+</body>
+</html>

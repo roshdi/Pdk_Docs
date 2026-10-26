@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pdk-vs-ai-code-generation</title>
+  <link rel="stylesheet" href="github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>PDK and AI Code Generation</h1>
+<p>PDK and AI coding tools solve different problems and can be used together.</p>
+<h2>PDK Provides Deterministic Architecture</h2>
+<p>PDK starts from strongly typed definitions and applies versioned generators and
+conventions. Given the same definitions, PDK version, and options, generation is
+intended to produce the same infrastructure every time.</p>
+<p>This is useful for concerns that must remain consistent across many services and
+teams:</p>
+<ul>
+<li>Project structure</li>
+<li>Entity and persistence metadata</li>
+<li>Contracts and API infrastructure</li>
+<li>Permissions and security metadata</li>
+<li>Naming and architectural conventions</li>
+<li>Regeneration and upgrade workflows</li>
+</ul>
+<p>Generated PDK files are disposable and are not manually edited.</p>
+<h2>AI Provides Contextual Assistance</h2>
+<p>AI tools are useful for tasks that require interpretation, exploration, or
+developer judgment:</p>
+<ul>
+<li>Drafting domain behavior</li>
+<li>Explaining unfamiliar code</li>
+<li>Suggesting tests and refactorings</li>
+<li>Creating documentation</li>
+<li>Exploring design alternatives</li>
+<li>Assisting with migrations and integrations</li>
+</ul>
+<p>AI output can vary between runs and should be reviewed like other contributed
+code. It should not silently become the architectural source of truth.</p>
+<h2>Recommended Responsibility Boundary</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>PDK</th>
+<th>AI tool</th>
+<th>Developer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Structural metadata</td>
+<td>Defines and validates the model</td>
+<td>Helps author definitions</td>
+<td>Approves intent</td>
+</tr>
+<tr>
+<td>Repeatable infrastructure</td>
+<td>Generates deterministically</td>
+<td>Helps inspect or troubleshoot</td>
+<td>Reviews generated contracts</td>
+</tr>
+<tr>
+<td>Business rules</td>
+<td>Provides extension points</td>
+<td>Can draft implementations</td>
+<td>Owns and validates behavior</td>
+</tr>
+<tr>
+<td>Architecture decisions</td>
+<td>Enforces accepted conventions</td>
+<td>Explores alternatives</td>
+<td>Accepts and records decisions</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>Can generate conventional infrastructure tests</td>
+<td>Can propose scenarios</td>
+<td>Owns correctness and coverage</td>
+</tr>
+</tbody></table>
+<h2>Working Together</h2>
+<p>A productive workflow is:</p>
+<ol>
+<li>Developers record architectural intent in PDK definitions and ADRs.</li>
+<li>PDK validates definitions and generates conventional infrastructure.</li>
+<li>AI assists with developer-owned code, tests, documentation, and analysis.</li>
+<li>Developers review all behavior and update definitions when structure changes.</li>
+<li>PDK regenerates infrastructure from the updated source of truth.</li>
+</ol>
+<p>AI should not edit generated files because those changes will be lost during
+regeneration. It should modify definitions, generator templates, or explicitly
+developer-owned companion files according to the intended change.</p>
+<h2>Why Not Use AI Alone?</h2>
+<p>AI can produce boilerplate quickly, but independently generated implementations
+may drift across services and over time. PDK provides a stable metadata model,
+repeatable conventions, diagnostics, and a controlled regeneration lifecycle.</p>
+<h2>Why Not Use PDK Alone?</h2>
+<p>PDK intentionally does not generate business logic. Domain behavior requires
+product context and human accountability. AI can accelerate that work, while
+developers remain responsible for correctness.</p>
+<p>See the <a href="architecture/principles.html">PDK Architecture Principles</a> for the source
+of truth and generated-code policies.</p>
+
+  </article>
+</body>
+</html>

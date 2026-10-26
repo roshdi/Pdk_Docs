@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>README</title>
+  <link rel="stylesheet" href="../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>PDK Architecture</h1>
+<p>This directory is the source of truth for the architectural intent and
+decisions of Prime Development Kit (PDK).</p>
+<p>Use these documents when designing features, reviewing changes, or deciding
+between competing implementations. Code should follow accepted decisions. When
+code and documentation disagree, resolve the conflict explicitly rather than
+silently changing either one.</p>
+<h2>Current Reference</h2>
+<ul>
+<li><a href="vision.html">Vision</a>: product purpose, audience, goals, and boundaries</li>
+<li><a href="principles.html">Principles</a>: rules used to guide design tradeoffs</li>
+<li><a href="open-questions.html">Open Questions</a>: unresolved topics requiring decisions</li>
+<li><a href="decisions/README.html">Architecture Decision Records</a>: accepted and superseded decisions</li>
+</ul>
+<h2>Platform Structure</h2>
+<p><code>pdk new platform</code> generates a solution with the following layout:</p>
+<pre><code class="language-text">&lt;PlatformName&gt;/
+|-- Readme.md
+`-- src/
+    |-- &lt;PlatformName&gt;.sln
+    |-- Platform/
+    |   |-- &lt;RootNamespace&gt;.Core/
+    |   |-- &lt;RootNamespace&gt;.Platform/
+    |   |-- &lt;RootNamespace&gt;.Shared/
+    |   `-- &lt;RootNamespace&gt;.Contracts/
+    |-- Identity/
+    |   |-- &lt;RootNamespace&gt;.Identity.Core/
+    |   |-- &lt;RootNamespace&gt;.Identity.Api/
+    |   |-- &lt;RootNamespace&gt;.Identity.Web/
+    |   |-- &lt;RootNamespace&gt;.Identity.UnitTests/
+    |   `-- &lt;RootNamespace&gt;.Identity.IntegrationTests/
+    |-- Notification/
+    |   |-- &lt;RootNamespace&gt;.Notification.Core/
+    |   |-- &lt;RootNamespace&gt;.Notification.Api/
+    |   |-- &lt;RootNamespace&gt;.Notification.Web/
+    |   |-- &lt;RootNamespace&gt;.Notification.UnitTests/
+    |   `-- &lt;RootNamespace&gt;.Notification.IntegrationTests/
+    |-- File/
+    |   |-- &lt;RootNamespace&gt;.File.Core/
+    |   |-- &lt;RootNamespace&gt;.File.Api/
+    |   |-- &lt;RootNamespace&gt;.File.Web/
+    |   |-- &lt;RootNamespace&gt;.File.UnitTests/
+    |   `-- &lt;RootNamespace&gt;.File.IntegrationTests/
+    `-- Customer/
+        |-- &lt;RootNamespace&gt;.Customer.Core/
+        |-- &lt;RootNamespace&gt;.Customer.Api/
+        |-- &lt;RootNamespace&gt;.Customer.Web/
+        |-- &lt;RootNamespace&gt;.Customer.UnitTests/
+        `-- &lt;RootNamespace&gt;.Customer.IntegrationTests/
+</code></pre>
+<h3>Platform projects</h3>
+<p>The <code>Platform/</code> folder contains the four platform-level projects:</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>*.Core</code></td>
+<td>Entity capability interfaces, security abstractions, infrastructure extensions, and shared types. References <code>Pdk.Core</code>.</td>
+</tr>
+<tr>
+<td><code>*.Platform</code></td>
+<td>Contains <code>PlatformDefinition</code>, service definitions, and <code>EntityProfiles</code>. References <code>Pdk.Definitions</code> and <code>*.Core</code>.</td>
+</tr>
+<tr>
+<td><code>*.Shared</code></td>
+<td>Shared utilities and DTOs available to all projects. References <code>Pdk.Core</code>.</td>
+</tr>
+<tr>
+<td><code>*.Contracts</code></td>
+<td>Shared contract types and message definitions. References <code>Pdk.Core</code>.</td>
+</tr>
+</tbody></table>
+<h3>Service projects</h3>
+<p>Each built-in and custom service gets its own folder under <code>src/</code> with five
+projects following the naming convention <code>{RootNamespace}.{ServiceName}.{ProjectType}</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>*.Core</code></td>
+<td>Service-specific core abstractions, entity models, and business logic interfaces.</td>
+</tr>
+<tr>
+<td><code>*.Api</code></td>
+<td>Backend API features — commands, queries, handlers, and controllers.</td>
+</tr>
+<tr>
+<td><code>*.Web</code></td>
+<td>ASP.NET Core host project with <code>Program.cs</code> for configuring and running the application.</td>
+</tr>
+<tr>
+<td><code>*.UnitTests</code></td>
+<td>Unit tests for the service.</td>
+</tr>
+<tr>
+<td><code>*.IntegrationTests</code></td>
+<td>Integration tests for the service.</td>
+</tr>
+</tbody></table>
+<p>Built-in services (<code>Identity</code>, <code>Notification</code>, <code>File</code>) are selected during
+scaffolding via the interactive prompt. Custom services (e.g. <code>Customer</code>) are
+added by the developer for their business domain. All projects target <code>net10.0</code>
+with nullable enabled, implicit usings, and the latest C# language version.</p>
+<h2>PlatformDefinition</h2>
+<p>The <code>PlatformDefinition.cs</code> file in the Platform project is the single source
+of truth for the platform configuration. It contains three sections:</p>
+<h3>Platform</h3>
+<p>Defines identity metadata for the platform:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Name</code></td>
+<td>Platform name (e.g. <code>Sales</code>)</td>
+</tr>
+<tr>
+<td><code>RootNamespace</code></td>
+<td>Root namespace prefix for all projects (e.g. <code>PdkSample.Sales</code>)</td>
+</tr>
+<tr>
+<td><code>DisplayName</code></td>
+<td>Human-readable display name</td>
+</tr>
+</tbody></table>
+<h3>Infrastructure</h3>
+<p>Records the technology choices for the platform:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Options</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DatabaseProvider</code></td>
+<td><code>SqlServer</code>, <code>PostgreSql</code>, <code>Oracle</code>, <code>Sqlite</code></td>
+<td>Primary database provider</td>
+</tr>
+<tr>
+<td><code>MessageBroker</code></td>
+<td><code>RabbitMq</code>, <code>AzureServiceBus</code>, <code>AmazonSqs</code>, <code>None</code></td>
+<td>Message broker selection</td>
+</tr>
+<tr>
+<td><code>CacheProvider</code></td>
+<td><code>Redis</code>, <code>Memory</code>, <code>None</code></td>
+<td>Distributed cache provider</td>
+</tr>
+<tr>
+<td><code>OpenTelemetry</code></td>
+<td>(flag)</td>
+<td>Enables OpenTelemetry instrumentation</td>
+</tr>
+</tbody></table>
+<p>Infrastructure choices are metadata in the current preview. Selecting
+PostgreSQL, RabbitMQ, Redis, or OpenTelemetry does not yet produce complete
+runtime integration for those technologies.</p>
+<h3>Services</h3>
+<p>Registers built-in and custom services. The developer can add:</p>
+<ul>
+<li><strong>Built-in services</strong> (<code>IdentityService</code>, <code>NotificationService</code>,
+<code>FileService</code>) — selected during scaffolding via the interactive prompt.
+These are currently stubs with no implementation beyond entity profile
+defaults.</li>
+<li><strong>Custom services</strong> — any additional <code>ServiceDefinition</code> subclass that
+the developer defines for their business domain.</li>
+</ul>
+<p>Services are registered via <code>x.Add&lt;TService&gt;()</code> in the <code>Services(...)</code> section
+of <code>PlatformDefinition.cs</code>.</p>
+<h2>Entity Capability Interfaces</h2>
+<p>The Core project contains an <code>Entities/</code> folder with default interfaces that
+add capabilities to entities. Implementing these interfaces on an entity class
+enables specific behaviors in the generated code.</p>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Capability</th>
+<th>Properties</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ICreatedEntity</code></td>
+<td>Creation audit tracking</td>
+<td><code>CreatedOn</code>, <code>CreatedBy</code> — auto-set via <code>IRequestContext</code></td>
+</tr>
+<tr>
+<td><code>IModifiedEntity</code></td>
+<td>Modification audit tracking</td>
+<td><code>ModifiedOn</code>, <code>ModifiedBy</code> — auto-set when entity changes</td>
+</tr>
+<tr>
+<td><code>IDeletedEntity</code></td>
+<td>Soft delete with full audit</td>
+<td><code>IsDeleted</code>, <code>DeletedOn</code>, <code>DeletedBy</code> — set/unset methods with timestamp</td>
+</tr>
+<tr>
+<td><code>ISoftDeleteEntity</code></td>
+<td>Soft delete (simplified)</td>
+<td><code>IsDeleted</code>, <code>DeletedOn</code>, <code>DeletedBy</code> — set/unset without timestamp</td>
+</tr>
+<tr>
+<td><code>IConcurrentEntity</code></td>
+<td>Optimistic concurrency</td>
+<td><code>Version</code> string for row-level conflict detection</td>
+</tr>
+</tbody></table>
+<p>These interfaces are default generated code. Developers can customize them or
+add any other interfaces as needed.</p>
+<p><code>IConcurrentEntity</code> provides optimistic concurrency via a <code>string Version</code>
+property that maps to each database provider&#39;s native concurrency mechanism
+(SQL Server <code>rowversion</code>, PostgreSQL <code>xmin</code>, Oracle trigger-incremented <code>NUMBER</code>).
+Any interface implementing <code>IOptimisticConcurrency</code> is detected automatically
+by the code generator, which emits <code>HasRowVersion</code> in the entity type
+configuration. Capability interfaces can also define an optional static
+<code>Configure</code> method for property-level EF Core configuration (max length,
+precision, defaults). See the
+<a href="../entity-capability-guide.html">Entity Feature and Capability Guide</a> for details.</p>
+<p>The Core project also provides:</p>
+<ul>
+<li><strong>Security interfaces</strong> (<code>IBasicSecurity</code>, <code>IOwnedSecurity</code>, <code>IUnitSecurity</code>)
+that add permission and scope constraints to entities.</li>
+<li><strong><code>IAuthService</code></strong> and <strong><code>IClockService</code></strong> abstractions for authentication
+and time.</li>
+<li><strong><code>RequestContextExtensions</code></strong> that expose <code>Clock</code> and <code>Auth</code> from
+<code>IRequestContext</code>.</li>
+</ul>
+<h2>Generation Pipeline</h2>
+<p>PDK uses a build-integrated generation approach. After <code>pdk new platform</code>
+scaffolds the platform structure, every subsequent build of the Platform
+project regenerates all service Core and API projects from the
+<code>PlatformDefinition</code> source of truth.</p>
+<h3>Stages</h3>
+<ol>
+<li><p><strong><code>pdk new platform</code></strong> scaffolds the platform solution, Core abstractions,
+contracts, and the Platform project containing <code>PlatformDefinition.cs</code>.</p>
+</li>
+<li><p><strong>Build of <code>*.Platform.csproj</code></strong> triggers the <code>AfterBuild</code> MSBuild target,
+which runs:</p>
+<pre><code>pdk generate platform &quot;$(TargetPath)&quot; &quot;$(ProjectDir)&quot;
+</code></pre>
+</li>
+<li><p><strong><code>pdk generate platform</code></strong> reflects over the compiled <code>PlatformDefinition</code>,
+initializes the metadata graph, validates all service definitions, and
+creates or updates all five projects (Core, Api, Web, UnitTests,
+IntegrationTests) for every registered service.</p>
+</li>
+</ol>
+<p>The first build of the Platform project generates all service projects.
+Subsequent builds update them when definitions change.</p>
+<h3>How it works</h3>
+<p>The <code>AfterBuild</code> target passes the compiled assembly path and project
+directory to the CLI. <code>GeneratePlatformHandler</code> loads the assembly,
+discovers the <code>PlatformDefinition</code> subclass, and calls <code>Initialize()</code> —
+which triggers <code>Configure()</code> on the platform and every registered
+service. After validation, it iterates over <code>PlatformMetadata.Services</code>
+and for each service:</p>
+<ul>
+<li>Creates the service directory at <code>{RootDir}/{ServiceName}/</code></li>
+<li>Generates <code>{RootNamespace}.{ServiceName}.Core</code>,
+<code>{RootNamespace}.{ServiceName}.Api</code>,
+<code>{RootNamespace}.{ServiceName}.Web</code>,
+<code>{RootNamespace}.{ServiceName}.UnitTests</code>, and
+<code>{RootNamespace}.{ServiceName}.IntegrationTests</code> projects</li>
+<li>Generates entity classes, entity type configurations, feature profiles,
+and a <code>{ServiceName}DbContext</code> in the Core project</li>
+<li>Creates or updates the service-specific <code>{ServiceName}.sln</code></li>
+<li>Adds all projects to the service solution and the platform solution</li>
+</ul>
+<p>Generated files are marked with <code>// &lt;pdk-auto-generated /&gt;</code> and are
+rewritten only when their content changes; developer-owned files are
+left intact.</p>
+<h3>Commands</h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pdk generate platform &lt;assembly&gt; &lt;project-dir&gt;</code></td>
+<td>Primary generation command, invoked by the build target</td>
+</tr>
+<tr>
+<td><code>pdk generate api &lt;assembly&gt; &lt;project-dir&gt;</code></td>
+<td>Direct invocation with explicit arguments</td>
+</tr>
+</tbody></table>
+<h3>Key types</h3>
+<ul>
+<li><strong><code>PlatformDefinition</code></strong> (Pdk.Definitions) — strongly typed source of
+truth for platform configuration and service registrations. Provides
+<code>Platform(...)</code>, <code>Infrastructure(...)</code>, and <code>Services(...)</code> configuration
+methods.</li>
+<li><strong><code>ServiceDefinition</code></strong> (Pdk.Definitions) — abstract base for individual
+service definitions; exposes <code>Metadata</code> (name, entities, security,
+dependencies).</li>
+<li><strong><code>GeneratePlatformHandler</code></strong> (Pdk.Cli) — loads the compiled platform
+assembly, initializes the definition, runs diagnostics, and orchestrates
+code generation via <code>ServiceCoreProjectGenerator</code> and
+<code>ServiceApiProjectGenerator</code>.</li>
+<li><strong><code>GenerateApiHandler</code></strong> (Pdk.Cli) — direct invocation handler with
+explicit arguments.</li>
+<li><strong><code>PlatformConfig</code></strong> (Pdk.Cli) — resolves paths for platform, service,
+and project locations.</li>
+<li><strong><code>GenerationContext</code></strong> (Pdk.Cli) — manages file writes with
+content-change detection and auto-generated markers.</li>
+</ul>
+<h2>Accepted Decisions</h2>
+<ul>
+<li><a href="decisions/ADR-001-strongly-typed-definitions.html">ADR-001: Strongly Typed Definitions Are the Structural Source of Truth</a></li>
+<li><a href="decisions/ADR-002-disposable-generated-code.html">ADR-002: Generated Code Is Disposable</a></li>
+<li><a href="decisions/ADR-003-cli-and-build-generation.html">ADR-003: Support CLI and Build-Time Generation</a></li>
+</ul>
+<h2>Updating the Architecture</h2>
+<ol>
+<li>Update <code>vision.md</code> when product purpose, audience, goals, or boundaries change.</li>
+<li>Update <code>principles.md</code> when a durable rule for design tradeoffs changes.</li>
+<li>Add unresolved topics to <code>open-questions.md</code> rather than presenting assumptions as decisions.</li>
+<li>Add an ADR for a significant decision that constrains future implementation.</li>
+<li>Supersede accepted ADRs with a new ADR; do not rewrite their decision history.</li>
+<li>Update affected links and current-state documents after a decision is accepted.</li>
+</ol>
+<h2>Status Vocabulary</h2>
+<ul>
+<li><strong>Proposed</strong>: under discussion and not yet authoritative</li>
+<li><strong>Accepted</strong>: approved and authoritative</li>
+<li><strong>Rejected</strong>: considered but intentionally not adopted</li>
+<li><strong>Superseded</strong>: replaced by a newer ADR</li>
+</ul>
+
+  </article>
+</body>
+</html>

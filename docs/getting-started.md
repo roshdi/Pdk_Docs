@@ -105,7 +105,7 @@ Sample/
     |   |-- Pdk.Sample.Catalog.Core/
     |   |   |-- Entities/
     |   |   |-- EntityConfigurations/
-    |   |   |-- Features/
+    |   |   |-- FeatureProfiles/
     |   |   `-- Pdk.Sample.Catalog.Core.csproj
     |   |-- Pdk.Sample.Catalog.Api/
     |   |-- Pdk.Sample.Catalog.Web/
@@ -115,7 +115,7 @@ Sample/
         |-- Pdk.Sample.Order.Core/
         |   |-- Entities/
         |   |-- EntityConfigurations/
-        |   |-- Features/
+        |   |-- FeatureProfiles/
         |   `-- Pdk.Sample.Order.Core.csproj
         |-- Pdk.Sample.Order.Api/
         |-- Pdk.Sample.Order.Web/
@@ -147,7 +147,7 @@ the naming convention `{RootNamespace}.{ServiceName}.{ProjectType}`:
 | `*.UnitTests` | Unit tests for the service. |
 | `*.IntegrationTests` | Integration tests for the service. |
 
-The `Core` project's `Features/` folder contains a `FeatureProfile` for each
+The `Core` project's `FeatureProfiles/` folder contains a `FeatureProfile` for each
 entity that controls which commands and queries are generated.
 
 ## Inspect the Platform Definition
@@ -365,7 +365,7 @@ and applies the same rule to item, save, bulk, and import handlers. See the
 
 Each entity gets a `FeatureProfile` that controls which commands and queries are
 generated and which fields are included. The Core project's `Features/` folder
-contains a generated profile for each entity.
+contains a generated profile for each entity under `FeatureProfiles/`.
 
 ### Single-Level Commands and Queries
 
@@ -392,12 +392,12 @@ This generates six operations:
 
 | Operation | HTTP | Endpoint | Description |
 | --- | --- | --- | --- |
-| CreateProductCategory | POST | `/Catalog/ProductCategories` | Create a new category |
-| UpdateProductCategory | PUT | `/Catalog/ProductCategories` | Update an existing category |
-| DeleteProductCategory | DELETE | `/Catalog/ProductCategories/{id}` | Soft-delete a category |
-| GetByIdProductCategory | GET | `/Catalog/ProductCategories/{id}` | Get a single category |
-| GetListProductCategory | GET | `/Catalog/ProductCategories` | Search/list categories |
-| GetLookupProductCategory | GET | `/Catalog/ProductCategories/Lookup` | Lightweight lookup |
+| CreateProductCategory | POST | `/api/Catalog/ProductCategories` | Create a new category |
+| UpdateProductCategory | PUT | `/api/Catalog/ProductCategories` | Update an existing category |
+| DeleteProductCategory | DELETE | `/api/Catalog/ProductCategories/{productCategoryId}` | Soft-delete when supported; otherwise hard-delete |
+| GetByIdProductCategory | GET | `/api/Catalog/ProductCategories/{productCategoryId}` | Get a single category |
+| GetListProductCategory | GET | `/api/Catalog/ProductCategories` | List categories; also generates POST `Search` |
+| GetLookupProductCategory | POST | `/api/Catalog/ProductCategories/GetLookup` | Paginated lookup |
 
 Feature profiles also define the expected API output set. If an operation such as
 `HasCreateCommand()` is removed, the next successful API generation deletes its
@@ -615,7 +615,9 @@ The create command accepts the order and its child items in a single request:
 }
 ```
 
-The `Customer` navigation is included as read-only reference data. The
+With the default `mapToEntity: true`, the `Customer` navigation is mapped onto
+the entity graph. For nested-command input, use `mapToEntity: false` and the
+[orchestration workflow](nested-command-orchestration.md). The
 `OrderItems` collection is included as child entities — `Sku` and `TotalPrice`
 are excluded because they are computed.
 
@@ -843,10 +845,16 @@ and project paths.
 
 ## Current Preview Limitations
 
-- Infrastructure choices (PostgreSQL, RabbitMQ, Redis, OpenTelemetry) are metadata
-  only — complete runtime integration is not yet generated.
-- Angular and PrimeNG UI generation are planned but not implemented.
-- Commands such as `pdk entity` are incomplete.
+- Database provider and cache integrations exist, but coverage varies. Redis uses
+  memory-backed L2 in Development; see the [cache guide](cache-guide.md).
+- Messaging and observability selections do not yet generate complete integration.
+- Angular and PrimeNG generation is implemented in preview; generated workspaces
+  still require validation and application-specific behavior.
+- `pdk add service` and `pdk entity` do not create definitions or entities. Edit
+  definitions directly and regenerate.
+
+See [Current implementation status](implementation-status.md) for the consolidated
+feature status and known limits.
 
 Use the [CLI Guide](pdk-cli-guide.md) for command details and the
 [architecture reference](architecture/README.md) for PDK's intended direction.

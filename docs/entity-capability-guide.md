@@ -5,8 +5,9 @@ Profiles and capability interfaces describe reusable behavior that generators
 can apply consistently across entities.
 
 > [!NOTE]
-> The definition API is available in the preview, but complete service and entity
-> code generation is still under development.
+> Definitions, service/entity generation, and API generation are implemented in
+> preview. Contracts and provider coverage are still evolving; see
+> [Current implementation status](implementation-status.md).
 
 ## Entity Model
 
@@ -438,7 +439,7 @@ public sealed class OrderService : ServiceDefinition
 ## DbContext Generation
 
 PDK generates a `{ServiceName}DbContext` in the service's Core project. The
-context extends `DbContextBase` from `Pdk.Data` and includes `DbSet` properties
+context extends `DbContextBase` from `Pdk.Core.Data` and includes `DbSet` properties
 for each entity.
 
 ### Generated Files
@@ -455,7 +456,7 @@ does not cause regeneration to overwrite it and identifies it as developer-modif
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
-using Pdk.Data;
+using Pdk.Core.Data;
 using Pdk.Sample.Order.Core.Entities;
 using Pdk.Sample.Order.Core.EntityConfigurations;
 
@@ -587,7 +588,8 @@ A `FeatureProfile<TEntity>` defines which commands and queries are generated
 for an entity and controls which fields are included in each operation.
 
 Each entity gets a generated feature profile in the Core project's `Features/`
-folder. Developers customize these profiles to control the generated API surface.
+folder (named `FeatureProfiles/`). Developers customize these profiles to control
+the generated API surface.
 
 ### Profile Structure
 

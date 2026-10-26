@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>open-questions</title>
+  <link rel="stylesheet" href="../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>PDK Architecture Open Questions</h1>
+<p>This file tracks unresolved architectural topics. An answer is not authoritative
+until it is incorporated into the current architecture and, when significant,
+recorded in an accepted ADR.</p>
+<h2>Platform Model</h2>
+<ul>
+<li>How are built-in services different from ordinary service definitions?</li>
+<li>Can a platform contain multiple instances of one service type with different configuration?</li>
+<li>Which platform metadata is required, optional, or derived?</li>
+</ul>
+<h2>Generation Model</h2>
+<ul>
+<li>Which artifacts are always regenerated and which are created once as companion files?</li>
+<li>How are obsolete generated files identified and removed safely?</li>
+<li>How should generator versions and metadata schema versions be represented?</li>
+<li>Should generation run in-process or in an isolated process when invoked by MSBuild?</li>
+</ul>
+<h2>Compatibility</h2>
+<ul>
+<li>What compatibility guarantees begin with PDK 1.0?</li>
+<li>How are definition deprecations announced and migrated?</li>
+<li>Which generated runtime contracts must remain stable across regeneration?</li>
+</ul>
+<h2>Extensibility</h2>
+<ul>
+<li>Can third parties add definitions, metadata processors, and generators?</li>
+<li>What is the ordering model for extensions?</li>
+<li>How are extension conflicts diagnosed?</li>
+</ul>
+<h2>Runtime Architecture</h2>
+<ul>
+<li>Which runtime capabilities belong in PDK Core versus generated application code?</li>
+<li>How do services select or override database, messaging, caching, and observability providers?
+<em>(Partially resolved: each <code>Pdk.Data.*</code> project provides provider-specific extensions such as <code>HasRowVersion</code> converters. Services reference the appropriate provider package.)</em></li>
+</ul>
+<h2>Security</h2>
+<ul>
+<li>What is the authoritative model for identity, permissions, scopes, and row-level security?</li>
+<li>Which security rules are build-time validated and which require runtime evaluation?</li>
+</ul>
+
+  </article>
+</body>
+</html>

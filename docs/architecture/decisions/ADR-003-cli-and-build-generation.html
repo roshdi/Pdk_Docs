@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADR-003-cli-and-build-generation</title>
+  <link rel="stylesheet" href="../../github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>ADR-003: Support CLI and Build-Time Generation</h1>
+<ul>
+<li>Status: Accepted</li>
+<li>Date: 2026-07-17</li>
+</ul>
+<h2>Context</h2>
+<p>Developers need explicit generation for scaffolding, troubleshooting, and
+automation. They also need generated artifacts to remain synchronized during
+ordinary builds without relying on a remembered manual step.</p>
+<p>Independent implementations for CLI and build generation could produce
+different output or validation behavior.</p>
+<h2>Decision</h2>
+<p>PDK supports both explicit CLI generation and build-integrated generation.</p>
+<p>Both invocation paths must call the same discovery, validation, metadata, and
+generation pipeline. Given the same definitions, PDK version, and options, both
+paths must produce equivalent output and diagnostics.</p>
+<h2>Consequences</h2>
+<ul>
+<li>Generation logic belongs in reusable services rather than command handlers or MSBuild tasks.</li>
+<li>Invocation-specific code is limited to input collection, environment setup, reporting, and exit behavior.</li>
+<li>Build integration must avoid recursive builds and unnecessary regeneration.</li>
+<li>CLI commands remain useful for diagnostics and CI workflows.</li>
+<li>Equivalence should be covered by automated tests.</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<h3>CLI-only generation</h3>
+<p>Rejected because generated output can become stale when developers forget to run
+the command.</p>
+<h3>Build-only generation</h3>
+<p>Rejected because explicit generation is valuable for scaffolding, debugging,
+automation, and inspecting failures independently of a full build.</p>
+<h3>Separate CLI and build pipelines</h3>
+<p>Rejected because duplicated logic would drift and undermine deterministic output.</p>
+
+  </article>
+</body>
+</html>

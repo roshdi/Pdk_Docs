@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pdk-cli-guide</title>
+  <link rel="stylesheet" href="github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>PDK CLI Guide</h1>
+<p>The PDK CLI scaffolds and generates Prime Development Kit applications. This
+guide documents the currently supported workflow for creating a platform.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li><a href="https://dotnet.microsoft.com/download/dotnet/10.0">.NET 10 SDK</a></li>
+<li>The <a href="https://www.nuget.org/packages/Pdk.Cli"><code>Pdk.Cli</code> NuGet package</a> installed as a global .NET tool</li>
+</ul>
+<p>Install the latest version from NuGet:</p>
+<pre><code class="language-shell">dotnet tool install --global Pdk.Cli
+</code></pre>
+<p>Update an existing installation:</p>
+<pre><code class="language-shell">dotnet tool update --global Pdk.Cli
+</code></pre>
+<p>Verify the installation:</p>
+<pre><code class="language-shell">pdk --version
+</code></pre>
+<p>Display the available commands:</p>
+<pre><code class="language-shell">pdk --help
+</code></pre>
+<h2>Create a Platform</h2>
+<p>Use <code>pdk new platform</code> to create a solution containing the platform definition,
+shared contracts, core abstractions, and selected services.</p>
+<pre><code class="language-shell">pdk new platform [name] [root-namespace]
+</code></pre>
+<p>Both arguments are optional. When supplied, they are used as the default values
+in the interactive prompts.</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>Platform and output directory name</td>
+<td><code>Sales</code></td>
+</tr>
+<tr>
+<td><code>root-namespace</code></td>
+<td>Root namespace for generated projects</td>
+<td><code>PdkSample.Sales</code></td>
+</tr>
+</tbody></table>
+<p>Show command-specific help:</p>
+<pre><code class="language-shell">pdk new platform --help
+</code></pre>
+<h3>Examples</h3>
+<p>Start with empty platform and namespace prompts:</p>
+<pre><code class="language-shell">pdk new platform
+</code></pre>
+<p>Provide the platform name as the initial prompt value:</p>
+<pre><code class="language-shell">pdk new platform Sales
+</code></pre>
+<p>Provide both initial values:</p>
+<pre><code class="language-shell">pdk new platform Sales PdkSample.Sales
+</code></pre>
+<h3>Interactive Configuration</h3>
+<p>The command collects the following configuration:</p>
+<ol>
+<li><strong>Platform Name</strong>: Used for the output directory, solution name, and platform metadata. The value is converted to PascalCase.</li>
+<li><strong>Root Namespace</strong>: Used as the namespace and project-name prefix.</li>
+<li><strong>Database</strong>: Select SQL Server, PostgreSQL, Oracle, or SQLite.</li>
+<li><strong>Built-in Services</strong>: Optionally select Identity, Notification, and File services. Use Space to toggle a service and Enter to continue.</li>
+<li><strong>Business Services</strong>: Enter one service name at a time. Submit an empty value to finish. Names are converted to PascalCase, and duplicate names are rejected case-insensitively.</li>
+</ol>
+<p>The command creates the platform in the current working directory. It stops if
+a directory with the generated platform name already exists.</p>
+<h2>Generated Structure</h2>
+<p>For this command:</p>
+<pre><code class="language-shell">pdk new platform Sales PdkSample.Sales
+</code></pre>
+<p>the generated structure is similar to:</p>
+<pre><code class="language-text">Sales/
+|-- Readme.md
+`-- src/
+    |-- Sales.sln
+    |-- Platform/
+    |   |-- PdkSample.Sales.Contracts/
+    |   |   `-- PdkSample.Sales.Contracts.csproj
+    |   |-- PdkSample.Sales.Core/
+    |   |   |-- Entities/
+    |   |   |-- Infrastructure/
+    |   |   |-- Security/
+    |   |   |-- Time/
+    |   |   |-- GlobalUsings.cs
+    |   |   `-- PdkSample.Sales.Core.csproj
+    |   |-- PdkSample.Sales.Platform/
+    |   |   |-- EntityProfiles.cs
+    |   |   |-- PlatformDefinition.cs
+    |   |   |-- &lt;SelectedService&gt;Service.cs
+    |   |   `-- PdkSample.Sales.Platform.csproj
+    |   `-- PdkSample.Sales.Shared/
+    |       `-- PdkSample.Sales.Shared.csproj
+    |-- Identity/
+    |   |-- PdkSample.Sales.Identity.Core/
+    |   |-- PdkSample.Sales.Identity.Api/
+    |   |-- PdkSample.Sales.Identity.Web/
+    |   |-- PdkSample.Sales.Identity.UnitTests/
+    |   `-- PdkSample.Sales.Identity.IntegrationTests/
+    `-- Customer/
+        |-- PdkSample.Sales.Customer.Core/
+        |-- PdkSample.Sales.Customer.Api/
+        |-- PdkSample.Sales.Customer.Web/
+        |-- PdkSample.Sales.Customer.UnitTests/
+        `-- PdkSample.Sales.Customer.IntegrationTests/
+</code></pre>
+<h3>Platform projects</h3>
+<p>The <code>Platform/</code> folder contains the four platform-level projects:</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>*.Core</code></td>
+<td>Entity capability interfaces, security abstractions, infrastructure extensions, and shared types. References <code>Pdk.Core</code>.</td>
+</tr>
+<tr>
+<td><code>*.Platform</code></td>
+<td>Contains <code>PlatformDefinition</code>, service definitions, and <code>EntityProfiles</code>. References <code>Pdk.Definitions</code> and <code>*.Core</code>.</td>
+</tr>
+<tr>
+<td><code>*.Shared</code></td>
+<td>Shared utilities and DTOs available to all projects. References <code>Pdk.Core</code>.</td>
+</tr>
+<tr>
+<td><code>*.Contracts</code></td>
+<td>Shared contract types and message definitions. References <code>Pdk.Core</code>.</td>
+</tr>
+</tbody></table>
+<h3>Service projects</h3>
+<p>Each service gets its own folder under <code>src/</code> with five projects following
+the naming convention <code>{RootNamespace}.{ServiceName}.{ProjectType}</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>*.Core</code></td>
+<td>Service-specific core abstractions, entity models, and business logic interfaces.</td>
+</tr>
+<tr>
+<td><code>*.Api</code></td>
+<td>Backend API features — commands, queries, handlers, and controllers.</td>
+</tr>
+<tr>
+<td><code>*.Web</code></td>
+<td>ASP.NET Core host with <code>Program.cs</code> for configuring and running the application.</td>
+</tr>
+<tr>
+<td><code>*.UnitTests</code></td>
+<td>Unit tests for the service.</td>
+</tr>
+<tr>
+<td><code>*.IntegrationTests</code></td>
+<td>Integration tests for the service.</td>
+</tr>
+</tbody></table>
+<p>Only selected built-in services are generated. Each service produces a
+<code>&lt;Name&gt;Service.cs</code> definition registered in <code>PlatformDefinition.cs</code>.</p>
+<h2>PlatformDefinition</h2>
+<p>The generated <code>PlatformDefinition.cs</code> contains three configuration sections.</p>
+<h3>Platform</h3>
+<p>Defines the identity metadata:</p>
+<pre><code class="language-csharp">Platform(platform =&gt;
+{
+    platform.Name(&quot;Sales&quot;)
+            .RootNamespace(&quot;PdkSample.Sales&quot;)
+            .DisplayName(&quot;Sales Platform&quot;);
+});
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Name</code></td>
+<td>Platform name, used for directory and solution naming</td>
+</tr>
+<tr>
+<td><code>RootNamespace</code></td>
+<td>Root namespace prefix for all generated projects</td>
+</tr>
+<tr>
+<td><code>DisplayName</code></td>
+<td>Human-readable display name</td>
+</tr>
+</tbody></table>
+<h3>Infrastructure</h3>
+<p>Records the technology choices:</p>
+<pre><code class="language-csharp">Infrastructure(infra =&gt;
+{
+    infra.DefaultDatabase(DatabaseProvider.PostgreSql)
+         .MessageBroker(MessageBroker.RabbitMq)
+         .Cache(CacheProvider.Redis)
+         .OpenTelemetry();
+});
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Options</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DatabaseProvider</code></td>
+<td><code>SqlServer</code>, <code>PostgreSql</code>, <code>Oracle</code>, <code>Sqlite</code></td>
+<td>Primary database provider</td>
+</tr>
+<tr>
+<td><code>MessageBroker</code></td>
+<td><code>RabbitMq</code>, <code>AzureServiceBus</code>, <code>AmazonSqs</code>, <code>None</code></td>
+<td>Message broker selection</td>
+</tr>
+<tr>
+<td><code>CacheProvider</code></td>
+<td><code>Redis</code>, <code>Memory</code>, <code>None</code></td>
+<td>Distributed cache provider</td>
+</tr>
+<tr>
+<td><code>OpenTelemetry</code></td>
+<td>(flag)</td>
+<td>Enables OpenTelemetry instrumentation</td>
+</tr>
+</tbody></table>
+<h3>Services</h3>
+<p>Registers built-in and custom services:</p>
+<pre><code class="language-csharp">Services(services =&gt;
+{
+    services.Add&lt;IdentityService&gt;();
+    services.Add&lt;NotificationService&gt;();
+    services.Add&lt;FileService&gt;();
+    // services.Add&lt;OrderService&gt;();
+});
+</code></pre>
+<p>The developer can add:</p>
+<ul>
+<li><strong>Built-in services</strong> — <code>IdentityService</code>, <code>NotificationService</code>, <code>FileService</code>.
+These are currently stubs with no implementation beyond entity profile defaults.
+They are selected during scaffolding via the interactive prompt.</li>
+<li><strong>Custom services</strong> — any additional <code>ServiceDefinition</code> subclass that
+the developer defines for their business domain.</li>
+</ul>
+<p>Use <code>x.Add&lt;TService&gt;()</code> in the <code>Services(...)</code> section to register a service.</p>
+<h2>Entity Capability Interfaces</h2>
+<p>The Core project contains an <code>Entities/</code> folder with default interfaces that
+add capabilities to entities. Implementing these interfaces on an entity class
+enables specific behaviors:</p>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Capability</th>
+<th>Properties</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ICreatedEntity</code></td>
+<td>Creation audit tracking</td>
+<td><code>CreatedOn</code>, <code>CreatedBy</code> — auto-set via <code>IRequestContext</code></td>
+</tr>
+<tr>
+<td><code>IModifiedEntity</code></td>
+<td>Modification audit tracking</td>
+<td><code>ModifiedOn</code>, <code>ModifiedBy</code> — auto-set when entity changes</td>
+</tr>
+<tr>
+<td><code>IDeletedEntity</code></td>
+<td>Soft delete with full audit</td>
+<td><code>IsDeleted</code>, <code>DeletedOn</code>, <code>DeletedBy</code> — set/unset methods with timestamp</td>
+</tr>
+<tr>
+<td><code>ISoftDeleteEntity</code></td>
+<td>Soft delete (simplified)</td>
+<td><code>IsDeleted</code>, <code>DeletedOn</code>, <code>DeletedBy</code> — set/unset without timestamp</td>
+</tr>
+<tr>
+<td><code>IConcurrentEntity</code></td>
+<td>Optimistic concurrency</td>
+<td><code>Version</code> string for row-level conflict detection</td>
+</tr>
+</tbody></table>
+<p>These are default generated code. Developers can customize them or add any other
+interfaces as needed. <code>IConcurrentEntity</code> is the default concurrency interface;
+any interface implementing <code>IOptimisticConcurrency</code> is detected automatically
+and mapped to the database&#39;s native concurrency mechanism via provider-specific
+converters in <code>Pdk.Data.*</code> packages. The Core project also provides security interfaces
+(<code>IBasicSecurity</code>, <code>IOwnedSecurity</code>, <code>IUnitSecurity</code>), authentication
+(<code>IAuthService</code>), and time (<code>IClockService</code>) abstractions.</p>
+<h2>Build-Time Service Generation</h2>
+<p>The generated Platform project contains an <code>AfterBuild</code> target that runs:</p>
+<pre><code class="language-shell">pdk generate platform &quot;$(TargetPath)&quot; &quot;$(ProjectDir)&quot;
+</code></pre>
+<p>The command reflects over the compiled <code>PlatformDefinition</code>, validates the
+metadata, and creates or updates all five projects (Core, Api, Web, UnitTests,
+IntegrationTests) for every registered built-in or business service. Projects
+are added to the platform solution and to a service-specific solution.
+Generated files are marked and are rewritten only when their content changes;
+developer-owned files are left intact.</p>
+<p>You can run the command directly when diagnosing generation or in CI:</p>
+<pre><code class="language-shell">pdk generate platform &lt;assembly-path&gt; &lt;platform-project-directory&gt;
+</code></pre>
+<h3>Direct API command</h3>
+<p><code>pdk generate api</code> accepts the same arguments and can be used as an
+alternative entry point:</p>
+<pre><code class="language-shell">pdk generate api &lt;assembly-path&gt; &lt;platform-project-directory&gt;
+</code></pre>
+<h2>Completion and Errors</h2>
+<p>Before reporting success, the CLI:</p>
+<ol>
+<li>Creates the solution.</li>
+<li>Generates all projects and source files.</li>
+<li>Adds each project to the solution.</li>
+<li>Builds the generated platform project.</li>
+</ol>
+<p>The command returns exit code <code>0</code> when all steps succeed. It returns <code>1</code> and
+prints an error when scaffolding or the final build fails.</p>
+<p>After successful generation, open the solution from the generated directory:</p>
+<pre><code class="language-shell">cd Sales/src
+dotnet build Sales.sln
+</code></pre>
+
+  </article>
+</body>
+</html>

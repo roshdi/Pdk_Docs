@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>entity-capability-guide</title>
+  <link rel="stylesheet" href="github-markdown.css">
+</head>
+<body>
+  <article class="markdown-body">
+<h1>PDK Entity Feature and Capability Guide</h1>
+<p>PDK entities are structural metadata declared inside a <code>ServiceDefinition</code>.
+Profiles and capability interfaces describe reusable behavior that generators
+can apply consistently across entities.</p>
+<blockquote>
+<p>[!NOTE]
+The definition API is available in the preview, but complete service and entity
+code generation is still under development.</p>
+</blockquote>
+<h2>Entity Model</h2>
+<p>The declaration hierarchy is:</p>
+<pre><code class="language-text">PlatformDefinition
+`-- ServiceDefinition
+    `-- EntityDefinition
+        |-- Table mapping
+        |-- Entity profile
+        |-- Explicit interfaces
+        `-- Security and permissions
+</code></pre>
+<h2>Capability Interfaces</h2>
+<p><code>Pdk.Core.Abstractions</code> provides capability contracts for creation,
+modification, soft deletion, and optimistic concurrency:</p>
+<ul>
+<li><code>ICreated</code></li>
+<li><code>IModified</code></li>
+<li><code>ISoftDelete</code></li>
+<li><code>IOptimisticConcurrency</code></li>
+</ul>
+<p>Applications define the properties and implementation used by generated entity
+types. For example:</p>
+<pre><code class="language-csharp">using Pdk.Core.Abstractions;
+
+public interface ICreatedEntity : ICreated
+{
+    DateTime CreatedOn { get; set; }
+
+    void ICreated.SetCreated(IRequestContext context)
+    {
+        CreatedOn = DateTime.UtcNow;
+    }
+}
+
+public interface ISoftDeleteEntity : ISoftDelete
+{
+    bool IsDeleted { get; set; }
+
+    void ISoftDelete.SetDeleted(IRequestContext context)
+    {
+        IsDeleted = true;
+    }
+
+    void ISoftDelete.SetUndeleted(IRequestContext context)
+    {
+        IsDeleted = false;
+    }
+}
+</code></pre>
+<p>Production applications should obtain time, identity, and tenant information
+from <code>IRequestContext</code> services rather than directly using static system APIs.</p>
+<h2>Reusable Profiles</h2>
+<p>An <code>EntityProfileDefinition</code> groups interfaces that are commonly applied
+together:</p>
+<pre><code class="language-csharp">using Pdk.Definitions.Entity;
+
+public static class EntityProfiles
+{
+    public static readonly EntityProfileDefinition Audited =
+        new EntityProfileDefinition()
+            .Implements&lt;ICreatedEntity&gt;();
+
+    public static readonly EntityProfileDefinition Aggregate =
+        new EntityProfileDefinition()
+            .Implements&lt;
+                ICreatedEntity,
+                ISoftDeleteEntity&gt;();
+}
+</code></pre>
+<p>Profiles are application-defined shared metadata. Configure static profiles once
+and treat them as immutable after startup.</p>
+<h2>Optimistic Concurrency</h2>
+<p>PDK supports optimistic concurrency through the <code>IOptimisticConcurrency</code>
+capability. Any interface that extends <code>IOptimisticConcurrency</code> is detected
+automatically by the code generator — regardless of its name or the name of
+the concurrency property.</p>
+<pre><code class="language-csharp">using Pdk.Core.Abstractions;
+
+public interface IConcurrentEntity : IOptimisticConcurrency
+{
+    string Version { get; set; }
+
+    void IOptimisticConcurrency.SetConcurrency(IRequestContext context)
+    {
+        // Version is managed by the database provider, not set manually.
+    }
+}
+</code></pre>
+<p><code>IConcurrentEntity</code> is the default generated example. Developers can define
+their own interfaces with any name and any property:</p>
+<pre><code class="language-csharp">public interface IOrderConcurrency : IOptimisticConcurrency
+{
+    string RowVersion { get; set; }
+}
+</code></pre>
+<p>The generator detects any interface implementing <code>IOptimisticConcurrency</code>,
+finds the first settable property on it, and emits:</p>
+<pre><code class="language-csharp">builder.HasRowVersion(e =&gt; e.PropertyName);
+</code></pre>
+<h3>Provider Mapping</h3>
+<p>Each provider maps the native concurrency type to the property type
+(typically <code>string</code>) automatically:</p>
+<table>
+<thead>
+<tr>
+<th>Database</th>
+<th>Native Type</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SQL Server</td>
+<td><code>byte[]</code></td>
+<td><code>rowversion</code> column via <code>IsRowVersion()</code></td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td><code>uint</code></td>
+<td><code>xmin</code> system column via <code>IsRowVersion()</code></td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td><code>long</code></td>
+<td>Trigger-incremented <code>NUMBER</code> via <code>IsRowVersion()</code> on <code>long</code></td>
+</tr>
+</tbody></table>
+<h3>Generated Code</h3>
+<p>When an entity implements any <code>IOptimisticConcurrency</code>-derived interface, the
+generated entity type configuration automatically emits:</p>
+<pre><code class="language-csharp">builder.HasRowVersion(e =&gt; e.PropertyName);
+</code></pre>
+<p>where <code>PropertyName</code> is the first settable property declared on the interface.</p>
+<p>Each <code>Pdk.Data.*</code> project provides:</p>
+<ul>
+<li>A <code>ValueConverter</code> that converts between the property type and the
+provider&#39;s native concurrency type.</li>
+<li>A <code>HasRowVersion&lt;TEntity&gt;()</code> extension method on <code>EntityTypeBuilder&lt;TEntity&gt;</code>
+that applies the converter automatically.</li>
+</ul>
+<p>Services reference the appropriate <code>Pdk.Data.*</code> package for their database
+provider. The generated code calls <code>HasRowVersion</code> with the same API regardless
+of provider; the correct extension method resolves based on the referenced
+package.</p>
+<h3>Example</h3>
+<p>Declare a custom concurrency interface:</p>
+<pre><code class="language-csharp">public interface IOrderConcurrency : IOptimisticConcurrency
+{
+    string RowVersion { get; set; }
+}
+</code></pre>
+<p>Register an entity with this interface:</p>
+<pre><code class="language-csharp">entities.Entity(&quot;Order&quot;)
+    .Table(&quot;Orders&quot;)
+    .Implements&lt;IOrderConcurrency&gt;();
+</code></pre>
+<p>The generated entity implements <code>IOrderConcurrency</code> with a <code>string RowVersion</code>
+property. The generated entity type configuration includes:</p>
+<pre><code class="language-csharp">public override void Configure(EntityTypeBuilder&lt;OrderEntity&gt; builder)
+{
+    builder.ToTable(&quot;Orders&quot;, schemaName);
+    ConfigureEntity(builder);
+    builder.HasRowVersion(e =&gt; e.RowVersion);
+}
+</code></pre>
+<p>When saving changes, EF Core throws <code>DbUpdateConcurrencyException</code> if the
+<code>RowVersion</code> value has changed since the entity was loaded.</p>
+<p>The default <code>IConcurrentEntity</code> with <code>string Version</code> works the same way:</p>
+<pre><code class="language-csharp">entities.Entity(&quot;Customer&quot;)
+    .Table(&quot;Customers&quot;)
+    .Implements&lt;IConcurrentEntity&gt;();
+
+// Generated: builder.HasRowVersion(e =&gt; e.Version);
+</code></pre>
+<h2>Capability Configuration</h2>
+<p>Capability interfaces can define EF Core property configuration through an
+optional static <code>Configure</code> method. The code generator detects this method and
+emits a call in the generated entity type configuration.</p>
+<h3>Convention</h3>
+<pre><code class="language-csharp">static void Configure&lt;TEntity&gt;(EntityTypeBuilder&lt;TEntity&gt; builder)
+    where TEntity : class, IMyCapability
+</code></pre>
+<ul>
+<li><strong>Name</strong>: <code>Configure</code></li>
+<li><strong>Signature</strong>: generic, takes <code>EntityTypeBuilder&lt;TEntity&gt;</code>, constrained to
+<code>where TEntity : class, I{CapabilityName}</code></li>
+<li><strong>Optional</strong>: only interfaces that need custom configuration implement it</li>
+</ul>
+<h3>Example</h3>
+<p>The default <code>ICreatedEntity</code> declares properties but does not configure string
+lengths. A developer can add configuration:</p>
+<pre><code class="language-csharp">using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Pdk.Core.Abstractions;
+
+public interface ICreatedEntity : ICreated
+{
+    DateTime CreatedDate { get; set; }
+    [AuthId] AuthId CreatedBy { get; set; }
+    string CreatedByUserName { get; set; }
+
+    void ICreated.SetCreated(IRequestContext context)
+    {
+        CreatedDate = context.Clock.Now;
+        CreatedBy = context.Auth.CurrentUserId;
+        CreatedByUserName = context.Auth.UserName;
+    }
+
+    static void Configure&lt;TEntity&gt;(EntityTypeBuilder&lt;TEntity&gt; builder)
+        where TEntity : class, ICreatedEntity
+    {
+        builder.Property(e =&gt; e.CreatedByUserName).HasMaxLength(50);
+    }
+}
+</code></pre>
+<p>The generated entity type configuration calls this method automatically:</p>
+<pre><code class="language-csharp">public override void Configure(EntityTypeBuilder&lt;OrderEntity&gt; builder)
+{
+    builder.ToTable(tableName, schemaName);
+    ConfigureEntity(builder);
+    ICreatedEntity.Configure(builder);
+}
+</code></pre>
+<p>No manual partial class configuration is needed for standard capabilities.</p>
+<h3>Automatic vs Manual Configuration</h3>
+<table>
+<thead>
+<tr>
+<th>Behavior</th>
+<th>Trigger</th>
+<th>Developer Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>HasRowVersion</code></td>
+<td>Any <code>IOptimisticConcurrency</code> interface</td>
+<td>None — just implement the interface</td>
+</tr>
+<tr>
+<td><code>Configure</code> method call</td>
+<td>Static <code>Configure</code> method on interface</td>
+<td>Write the method if property config is needed</td>
+</tr>
+<tr>
+<td>Manual <code>ConfigureEntity</code></td>
+<td>Non-generated partial class</td>
+<td>Hand-write in <code>EntityTypeConfiguration.cs</code></td>
+</tr>
+</tbody></table>
+<p><code>HasRowVersion</code> is <strong>automatic</strong> — the generator always emits it for concurrency
+interfaces. The <code>Configure</code> method is <strong>optional</strong> — only written when the
+capability needs property-level configuration like max length, precision, or
+default values.</p>
+<h3>Multiple Capabilities</h3>
+<p>An entity can implement multiple capabilities, each with its own <code>Configure</code>
+method. All are called in the generated configuration:</p>
+<pre><code class="language-csharp">public override void Configure(EntityTypeBuilder&lt;OrderEntity&gt; builder)
+{
+    builder.ToTable(tableName, schemaName);
+    ConfigureEntity(builder);
+    builder.HasRowVersion(e =&gt; e.RowVersion);  // automatic
+    IOrderConcurrency.Configure(builder);       // from Configure method
+    ICreatedEntity.Configure(builder);          // from Configure method
+}
+</code></pre>
+<h2>Register Entities</h2>
+<p>Set a default profile for a service and override it where needed:</p>
+<pre><code class="language-csharp">using Pdk.Definitions.Service;
+
+public sealed class CustomerService : ServiceDefinition
+{
+    protected override void Configure()
+    {
+        Entities(entities =&gt;
+        {
+            entities.DefaultProfile(EntityProfiles.Aggregate);
+
+            entities.Entity(&quot;Customer&quot;)
+                .Table(&quot;Customers&quot;);
+
+            entities.Entity(&quot;CustomerNote&quot;)
+                .Table(&quot;CustomerNotes&quot;)
+                .Profile(EntityProfiles.Audited)
+                .Implements&lt;ISoftDeleteEntity&gt;();
+
+            entities.Entity(&quot;ImportRow&quot;)
+                .OverrideImplements&lt;ICreatedEntity, ISoftDeleteEntity&gt;();
+        });
+    }
+}
+</code></pre>
+<p>Use:</p>
+<ul>
+<li><code>DefaultProfile(...)</code> for entities subsequently added by the builder.</li>
+<li><code>Profile(...)</code> to select a profile for one entity.</li>
+<li><code>Implements&lt;T&gt;()</code> to add explicit interfaces.</li>
+<li><code>OverrideImplements&lt;T&gt;()</code> to replace explicitly configured interfaces.</li>
+<li><code>Table(...)</code> to set the persistence table name.</li>
+</ul>
+<p>Duplicate entity names are compared case-insensitively and produce diagnostic
+<code>PDK201</code>.</p>
+<h2>DbContext Generation</h2>
+<p>PDK generates a <code>{ServiceName}DbContext</code> in the service&#39;s Core project. The
+context extends <code>DbContextBase</code> from <code>Pdk.Data</code> and includes <code>DbSet</code> properties
+for each entity.</p>
+<h3>Generated Files</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>{ServiceName}DbContext.g.cs</code></td>
+<td>Auto-generated: constructor, <code>OnModelCreating</code>, <code>DbSet</code> properties</td>
+</tr>
+<tr>
+<td><code>{ServiceName}DbContext.cs</code></td>
+<td>Developer-editable scaffold (created once, not overwritten)</td>
+</tr>
+</tbody></table>
+<h3>Generated DbContext</h3>
+<pre><code class="language-csharp">using Microsoft.EntityFrameworkCore;
+using Pdk.Data;
+using PdkSample.Sales.Customer.Core.Entities;
+using PdkSample.Sales.Customer.Core.EntityConfigurations;
+
+namespace PdkSample.Sales.Customer.Core;
+
+public partial class CustomerDbContext : DbContextBase
+{
+    public CustomerDbContext(DbContextOptions&lt;CustomerDbContext&gt; options)
+        : base(options)
+    {
+        DefaultSchema = &quot;Customer&quot;;
+        MoreOptions(options);
+    }
+
+    partial void MoreOptions(DbContextOptions options);
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfiguration(new CustomerEntityTypeConfiguration(DefaultSchema));
+        modelBuilder.ApplyConfiguration(new CustomerNoteEntityTypeConfiguration(DefaultSchema));
+        MoreOnModelCreating(modelBuilder);
+    }
+
+    partial void MoreOnModelCreating(ModelBuilder modelBuilder);
+
+    public DbSet&lt;CustomerEntity&gt; Customers =&gt; Set&lt;CustomerEntity&gt;();
+    public DbSet&lt;CustomerNoteEntity&gt; CustomerNotes =&gt; Set&lt;CustomerNoteEntity&gt;();
+}
+</code></pre>
+<h3>Extension Points</h3>
+<table>
+<thead>
+<tr>
+<th>Partial Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MoreOptions(DbContextOptions options)</code></td>
+<td>Configure provider-specific options or change <code>DefaultSchema</code></td>
+</tr>
+<tr>
+<td><code>MoreOnModelCreating(ModelBuilder modelBuilder)</code></td>
+<td>Add indexes, constraints, seed data, or additional configuration</td>
+</tr>
+</tbody></table>
+<p>The <code>DefaultSchema</code> property defaults to the service name. Change it in
+<code>MoreOptions</code> if needed:</p>
+<pre><code class="language-csharp">public partial class CustomerDbContext
+{
+    partial void MoreOptions(DbContextOptions options)
+    {
+        DefaultSchema = &quot;sales&quot;;
+    }
+}
+</code></pre>
+<h3>DbSet Naming</h3>
+<p><code>DbSet</code> property names are pluralized from the entity name:
+<code>Customer</code> → <code>Customers</code>, <code>Order</code> → <code>Orders</code>, <code>CustomerNote</code> → <code>CustomerNotes</code>.</p>
+<h3>Multiple Entities</h3>
+<p>Each entity registered in the service definition gets:</p>
+<ul>
+<li>A <code>DbSet&lt;TEntity&gt;</code> property on the DbContext</li>
+<li>An <code>ApplyConfiguration</code> call in <code>OnModelCreating</code></li>
+<li>Its own <code>EntityTypeConfiguration</code> class</li>
+</ul>
+<h2>Entity Security</h2>
+<p>Security capabilities implement <code>ISecurity</code> and declare supported permissions
+and scopes:</p>
+<pre><code class="language-csharp">using Pdk.Core.Security;
+
+public interface IBasicSecurity : ISecurity
+{
+    static void ISecurity.ConfigurePermissions(PermissionBuilder permissions)
+    {
+        permissions.Read();
+        permissions.Create().ImpliesRead();
+        permissions.Update().ImpliesRead();
+        permissions.Delete().ImpliesRead();
+    }
+
+    static SecurityScopeDefinition[] ISecurity.GetAvailableScopes() =&gt;
+    [
+        new(SecurityScopeDefinition.DenyAllScopeId, &quot;Deny all&quot;),
+        new(SecurityScopeDefinition.AllowAllScopeId, &quot;Allow all&quot;)
+    ];
+}
+</code></pre>
+<p>Associate the capability and configure entity-specific permission groups:</p>
+<pre><code class="language-csharp">entities.Entity(&quot;Customer&quot;)
+    .HasSecurity&lt;IBasicSecurity&gt;(permissions =&gt;
+    {
+        var standard = permissions.Default();
+        standard.Read();
+        standard.Create().ImpliesRead();
+        standard.Update().ImpliesRead();
+        standard.Delete().ImpliesRead();
+
+        permissions.Group(&quot;Workflow&quot;)
+            .Add(&quot;Approve&quot;)
+            .ImpliesRead();
+    });
+</code></pre>
+<p>Capability permissions describe what a security model supports. Entity
+permission groups describe the permissions generated for a specific entity.</p>
+<p>See the <a href="security-capability-guide.html">Security Capability Guide</a> for the broader
+security model. Some examples in that guide may evolve while the preview APIs
+are being consolidated.</p>
+<h2>Register the Service</h2>
+<p>Services belong to a platform:</p>
+<pre><code class="language-csharp">public sealed class SalesPlatform : PlatformDefinition
+{
+    public override void Configure()
+    {
+        Platform(platform =&gt; platform
+            .Name(&quot;Sales&quot;)
+            .RootNamespace(&quot;Sales&quot;));
+
+        Services(services =&gt;
+        {
+            services.Add&lt;CustomerService&gt;();
+        });
+    }
+}
+</code></pre>
+<p>Registering the same service type twice produces diagnostic <code>PDK101</code>.</p>
+
+  </article>
+</body>
+</html>
